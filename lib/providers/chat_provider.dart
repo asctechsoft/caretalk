@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:care_talk/models/chat_message_model.dart';
 import 'package:care_talk/core/services/firebase_service.dart';
-import 'package:care_talk/core/network/api_gateway.dart';
 import 'package:logger/logger.dart';
 
 /// Provider quản lý trạng thái Chat
 class ChatProvider extends ChangeNotifier {
   final FirebaseService _firebase = FirebaseService();
-  final ApiGateway _api = ApiGateway();
   final Logger _logger = Logger();
 
   // ─── State ─────────────────────────────────────────────────────────
@@ -153,40 +151,32 @@ class ChatProvider extends ChangeNotifier {
         );
       }
 
-      // Gọi API chatbot để lấy phản hồi
+      // Giả lập phản hồi từ Bot (Vì chưa có API chatbot thật)
       _isTyping = true;
       _isSending = false;
       notifyListeners();
 
-      final response = await _api.sendMessage(
-        message: message,
-        sessionId: _currentSessionId,
+      await Future.delayed(const Duration(seconds: 1));
+      
+      final botReply = 'Chào bạn, câu hỏi của bạn đã được ghi nhận. Tôi đang phân tích các triệu chứng này...';
+
+      final botMessage = ChatMessageModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        message: botReply,
+        senderId: 'bot',
+        senderType: SenderType.bot,
+        timestamp: DateTime.now(),
       );
+      _messages.add(botMessage);
 
-      if (response.isSuccess && response.data != null) {
-        final botReply = response.data!['reply'] as String? ??
-            'Xin lỗi, tôi không hiểu yêu cầu của bạn.';
-
-        final botMessage = ChatMessageModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+      // Lưu phản hồi bot vào Firestore
+      if (_currentSessionId != null) {
+        await _firebase.sendChatMessage(
+          sessionId: _currentSessionId!,
           message: botReply,
           senderId: 'bot',
-          senderType: SenderType.bot,
-          timestamp: DateTime.now(),
+          senderType: 'bot',
         );
-        _messages.add(botMessage);
-
-        // Lưu phản hồi bot vào Firestore
-        if (_currentSessionId != null) {
-          await _firebase.sendChatMessage(
-            sessionId: _currentSessionId!,
-            message: botReply,
-            senderId: 'bot',
-            senderType: 'bot',
-          );
-        }
-      } else {
-        _addBotErrorMessage();
       }
     } catch (e) {
       _logger.e('Send message error: $e');

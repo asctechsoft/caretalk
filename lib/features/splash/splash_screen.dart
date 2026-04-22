@@ -59,6 +59,8 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (user?.role == 'doctor' && !user!.isProfileComplete) {
         context.go(AppRouter.doctorSupplementInfoPath);
+      } else if (user?.role == 'patient') {
+        context.go(AppRouter.patientHomePath);
       } else {
         context.go(AppRouter.homePath);
       }

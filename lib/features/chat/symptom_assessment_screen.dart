@@ -281,117 +281,130 @@ class SymptomAssessmentScreen extends StatelessWidget {
   Widget _buildModerateUI(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimens.xl),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFEBEE),
-                  shape: BoxShape.circle,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimens.md),
+            child: Column(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFEBEE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFD32F2F),
+                    size: 30,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Color(0xFFD32F2F),
-                  size: 50,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEE),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.circle, color: Color(0xFFB71C1C), size: 8),
-                    SizedBox(width: 8),
-                    Text(
-                      'MỨC ĐỘ NẶNG',
-                      style: TextStyle(
-                        color: Color(0xFFB71C1C),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Kết quả Phân tích\nChi tiết',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Sức khỏe của bạn là ưu tiên hàng đầu. Chúng tôi khuyên bạn nên tham khảo ý kiến chuyên gia ngay bây giờ.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, height: 1.5),
-              ),
-              const SizedBox(height: 32),
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEDF2FF),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFD0E0FF)),
-                ),
-                child: Column(
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.volunteer_activism_outlined,
-                          color: AppColors.primary,
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.circle, color: Color(0xFFB71C1C), size: 8),
+                      SizedBox(width: 8),
+                      Text(
+                        'MỨC ĐỘ NẶNG',
+                        style: TextStyle(
+                          color: Color(0xFFB71C1C),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
                         ),
-                        SizedBox(width: 12),
-                        Text(
-                          'Chúng tôi luôn ở đây cùng bạn',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Kết quả phân tích',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sức khỏe của bạn là ưu tiên hàng đầu. Chúng tôi khuyên bạn nên tham khảo ý kiến chuyên gia ngay bây giờ.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF2FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFD0E0FF)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.volunteer_activism_outlined,
                             color: AppColors.primary,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Đừng lo lắng, chúng tôi sẽ hỗ trợ bạn kết nối với bác sĩ nhanh nhất có thể. Trong khi chờ đợi, hãy giữ bình tĩnh và nghỉ ngơi. Nếu tình trạng không cải thiện sau 15 phút, bạn nên đến cơ sở y tế gần nhất để được chăm sóc trực tiếp nhé.',
-                      style: TextStyle(
-                        color: Colors.blueGrey[700],
-                        fontSize: 13,
-                        height: 1.6,
+                          SizedBox(width: 12),
+                          Text(
+                            'Chúng tôi luôn ở đây cùng bạn',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Đừng lo lắng, chúng tôi sẽ hỗ trợ bạn kết nối với bác sĩ nhanh nhất có thể. Trong khi chờ đợi, hãy giữ bình tĩnh và nghỉ ngơi. Nếu tình trạng không cải thiện sau 15 phút, bạn nên đến cơ sở y tế gần nhất để được chăm sóc trực tiếp nhé.',
+                        style: TextStyle(
+                          color: Colors.blueGrey[700],
+                          fontSize: 13,
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-              AppButton(
-                text: 'Liên hệ với bác sĩ ngay',
-                icon: Icons.medical_services_outlined,
-                onPressed: () => _handleContactDoctor(context),
-              ),
-              const SizedBox(height: 12),
-              AppButton(
-                text: 'Tiếp tục trò chuyện',
-                backgroundColor: const Color(0xFFECEFF1),
-                textColor: Colors.black87,
-                icon: Icons.chat_bubble_outline_rounded,
-                onPressed: () => Navigator.pop(context),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 24),
+                AppButton(
+                  text: 'Liên hệ với bác sĩ ngay',
+                  icon: Icons.medical_services_outlined,
+                  onPressed: () => _handleContactDoctor(context),
+                ),
+                const SizedBox(height: 12),
+                AppButton(
+                  text: 'Tiếp tục trò chuyện',
+                  backgroundColor: const Color(0xFFECEFF1),
+                  textColor: Colors.black87,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -402,14 +415,25 @@ class SymptomAssessmentScreen extends StatelessWidget {
   Widget _buildLowRiskUI(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFD0E0FF),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 40),
             Center(
               child: Container(
-                width: 120,
-                height: 120,
+                width: 70,
+                height: 70,
                 decoration: const BoxDecoration(
                   color: Color(0xFF81C784),
                   shape: BoxShape.circle,
@@ -417,11 +441,11 @@ class SymptomAssessmentScreen extends StatelessWidget {
                 child: const Icon(
                   Icons.check_circle_rounded,
                   color: Colors.white,
-                  size: 80,
+                  size: 50,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             const Text(
               'Nguy cơ thấp',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -444,76 +468,78 @@ class SymptomAssessmentScreen extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FBE7),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE6EE9C)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Khả năng cao là: Cảm lạnh thông thường',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF827717),
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Gợi ý xử lý tại nhà:',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildStep('Nghỉ ngơi uống nhiều nước ấm'),
-                          _buildStep('Súc họng bằng nước muối'),
-                          _buildStep('Có thể dùng thuốc hạ sốt nếu cần'),
-                          _buildStep('Theo dõi triệu chứng 2-3 ngày'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3F2FD),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.info_outline, color: Colors.blue),
-                              SizedBox(width: 12),
-                              Text(
-                                'Khi nào cần đi khám ngay?',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FBE7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE6EE9C)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Khả năng cao là: Cảm lạnh thông thường',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF827717),
+                                fontSize: 16,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _buildWarningPoint(
-                            'Nếu triệu chứng nặng hơn, sốt cao trên 39°C',
-                          ),
-                          _buildWarningPoint(
-                            'Đau ngực hoặc không cải thiện sau 3 ngày',
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Gợi ý xử lý tại nhà:',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildStep('Nghỉ ngơi uống nhiều nước ấm'),
+                            _buildStep('Súc họng bằng nước muối'),
+                            _buildStep('Có thể dùng thuốc hạ sốt nếu cần'),
+                            _buildStep('Theo dõi triệu chứng 2-3 ngày'),
+                          ],
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    AppButton(
-                      text: 'Tôi đã hiểu',
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.blue),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Khi nào cần đi khám ngay?',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildWarningPoint(
+                              'Nếu triệu chứng nặng hơn, sốt cao trên 39°C',
+                            ),
+                            _buildWarningPoint(
+                              'Đau ngực hoặc không cải thiện sau 3 ngày',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      AppButton(
+                        text: 'Tôi đã hiểu',
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -563,24 +589,21 @@ class SymptomAssessmentScreen extends StatelessWidget {
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        insetPadding: const EdgeInsets.all(16),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8EAF6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.medical_services_outlined,
-                  color: AppColors.primary,
-                  size: 32,
+              Center(
+                child: Image.asset(
+                  'assets/images/img_logo.png',
+                  fit: BoxFit.contain,
+                  width: 60,
+                  height: 60,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Text(
                 'Kết nối với Bác sĩ',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),

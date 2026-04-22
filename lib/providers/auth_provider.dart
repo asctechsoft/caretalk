@@ -1,12 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_talk/models/user_model.dart';
 import 'package:care_talk/core/services/storage_service.dart';
-import 'package:care_talk/core/network/api_gateway.dart';
+import 'package:care_talk/core/services/firebase_service.dart';
+import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 /// Provider quản lý trạng thái xác thực
 class AuthProvider extends ChangeNotifier {
-  final ApiGateway _api = ApiGateway();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseService _firebaseService = FirebaseService();
   final StorageService _storage = StorageService();
   final Logger _logger = Logger();
 
@@ -36,6 +39,7 @@ class AuthProvider extends ChangeNotifier {
           fullName: userInfo['userName'] ?? '',
           email: userInfo['userEmail'] ?? '',
           phone: '',
+          role: userInfo['userRole'] ?? 'patient',
         );
       }
     }
@@ -50,16 +54,18 @@ class AuthProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      final response = await _api.login(email: email, password: password);
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      if (response.isSuccess && response.data != null) {
-        final data = response.data!;
-        final token = data['token'] as String?;
-        final userData = data['user'] as Map<String, dynamic>?;
-
-        if (token != null) {
-          await _storage.saveAccessToken(token);
-        }
+      final user = userCredential.user;
+      if (user != null) {
+        // Lấy thông tin user từ Firestore
+        final userData = await _firebaseService.getDocument(
+          collection: 'users',
+          documentId: user.uid,
+        );
 
         if (userData != null) {
           _currentUser = UserModel.fromJson(userData);
@@ -67,6 +73,7 @@ class AuthProvider extends ChangeNotifier {
             userId: _currentUser!.id,
             userName: _currentUser!.fullName,
             userEmail: _currentUser!.email,
+            userRole: _currentUser!.role,
           );
         }
 
@@ -75,10 +82,23 @@ class AuthProvider extends ChangeNotifier {
         _setLoading(false);
         return true;
       } else {
-        _setError(response.message ?? 'Đăng nhập thất bại');
+        _setError('Đăng nhập thất bại');
         _setLoading(false);
         return false;
       }
+    } on FirebaseAuthException catch (e) {
+      _logger.e('Login error: ${e.code}');
+      String message = 'Đã có lỗi xảy ra';
+      if (e.code == 'user-not-found') {
+        message = 'Không tìm thấy tài khoản với email này';
+      } else if (e.code == 'wrong-password') {
+        message = 'Mật khẩu không chính xác';
+      } else if (e.code == 'invalid-email') {
+        message = 'Email không hợp lệ';
+      }
+      _setError(message);
+      _setLoading(false);
+      return false;
     } catch (e) {
       _logger.e('Login error: $e');
       _setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
@@ -93,28 +113,57 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> register({
     required String fullName,
     required String email,
-    required String phone,
     required String password,
+    String phone = '',
   }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final response = await _api.register(
-        fullName: fullName,
+      final userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
-        phone: phone,
         password: password,
       );
 
-      if (response.isSuccess) {
+      final user = userCredential.user;
+      if (user != null) {
+        // Tạo user model
+        final newUser = UserModel(
+          id: user.uid,
+          fullName: fullName,
+          email: email,
+          phone: phone,
+          role: 'patient',
+          isProfileComplete: true,
+        );
+
+        // Lưu vào Firestore
+        await _firebaseService.createDocument(
+          collection: 'users',
+          documentId: user.uid,
+          data: newUser.toJson(),
+        );
+
         _setLoading(false);
         return true;
       } else {
-        _setError(response.message ?? 'Đăng ký thất bại');
+        _setError('Đăng ký thất bại');
         _setLoading(false);
         return false;
       }
+    } on FirebaseAuthException catch (e) {
+      _logger.e('Register error: ${e.code}');
+      String message = 'Đã có lỗi xảy ra';
+      if (e.code == 'weak-password') {
+        message = 'Mật khẩu quá yếu';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'Email này đã được sử dụng';
+      } else if (e.code == 'invalid-email') {
+        message = 'Email không hợp lệ';
+      }
+      _setError(message);
+      _setLoading(false);
+      return false;
     } catch (e) {
       _logger.e('Register error: $e');
       _setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
@@ -130,9 +179,9 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      await _api.logout();
+      await _auth.signOut();
     } catch (e) {
-      _logger.w('Logout API call failed: $e');
+      _logger.w('Logout FirebaseAuth failed: $e');
     }
 
     await _storage.clearAll();
@@ -145,16 +194,22 @@ class AuthProvider extends ChangeNotifier {
   // PROFILE
   // ═══════════════════════════════════════════════════════════════════
   Future<void> loadProfile() async {
+    if (_currentUser == null) return;
     _setLoading(true);
 
     try {
-      final response = await _api.getUserProfile();
-      if (response.isSuccess && response.data != null) {
-        _currentUser = UserModel.fromJson(response.data!);
+      final userData = await _firebaseService.getDocument(
+        collection: 'users',
+        documentId: _currentUser!.id,
+      );
+
+      if (userData != null) {
+        _currentUser = UserModel.fromJson(userData);
         await _storage.saveUserInfo(
           userId: _currentUser!.id,
           userName: _currentUser!.fullName,
           userEmail: _currentUser!.email,
+          userRole: _currentUser!.role,
         );
       }
     } catch (e) {
@@ -165,17 +220,24 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> updateProfile(Map<String, dynamic> data) async {
+    if (_currentUser == null) return false;
     _setLoading(true);
     _clearError();
 
     try {
-      final response = await _api.updateUserProfile(profileData: data);
-      if (response.isSuccess && response.data != null) {
-        _currentUser = UserModel.fromJson(response.data!);
+      final success = await _firebaseService.updateDocument(
+        collection: 'users',
+        documentId: _currentUser!.id,
+        data: data,
+      );
+
+      if (success) {
+        // Reload profile after update
+        await loadProfile();
         _setLoading(false);
         return true;
       } else {
-        _setError(response.message ?? 'Cập nhật thất bại');
+        _setError('Cập nhật thất bại');
         _setLoading(false);
         return false;
       }

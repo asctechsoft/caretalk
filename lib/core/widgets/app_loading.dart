@@ -7,12 +7,7 @@ class AppLoading extends StatelessWidget {
   final Color? color;
   final String? message;
 
-  const AppLoading({
-    super.key,
-    this.size = 40,
-    this.color,
-    this.message,
-  });
+  const AppLoading({super.key, this.size = 40, this.color, this.message});
 
   @override
   Widget build(BuildContext context) {

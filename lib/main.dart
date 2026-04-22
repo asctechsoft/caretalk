@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:care_talk/app.dart';
 
 /// Entry point của ứng dụng CareTalk
@@ -24,10 +24,7 @@ void main() async {
   ]);
 
   // ─── Firebase Initialization ───────────────────────────────────────
-  // TODO: Uncomment khi đã cấu hình Firebase
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+  await Firebase.initializeApp();
 
   // ─── Run App ───────────────────────────────────────────────────────
   runApp(const App());

@@ -36,49 +36,75 @@ class AppButton extends StatelessWidget {
     final fontSize = isSmall ? 14.0 : 16.0;
 
     if (isOutlined) {
-      return SizedBox(
-        width: isFullWidth ? double.infinity : null,
-        height: height,
-        child: OutlinedButton(
-          onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: textColor ?? AppColors.primary,
-            side: BorderSide(
-              color: backgroundColor ?? AppColors.primary,
-              width: 1.5,
-            ),
-            shape: RoundedRectangleBorder(
+      final color = textColor ?? AppColors.primary;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onPressed,
+          borderRadius: BorderRadius.circular(radius),
+          child: Ink(
+            width: isFullWidth ? double.infinity : null,
+            height: height,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(radius),
+              border: Border.all(
+                color: backgroundColor ?? AppColors.primary,
+                width: 1.5,
+              ),
             ),
-            textStyle: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
+            child: Center(
+              child: IconTheme(
+                data: IconThemeData(color: color),
+                child: DefaultTextStyle(
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                  child: _buildChild(fontSize, color),
+                ),
+              ),
             ),
           ),
-          child: _buildChild(fontSize, textColor ?? AppColors.primary),
         ),
       );
     }
 
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      height: height,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? AppColors.primary,
-          foregroundColor: textColor ?? AppColors.textOnPrimary,
-          shape: RoundedRectangleBorder(
+    final color = textColor ?? AppColors.textOnPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isLoading ? null : onPressed,
+        borderRadius: BorderRadius.circular(radius),
+        child: Ink(
+          width: isFullWidth ? double.infinity : null,
+          height: height,
+          decoration: BoxDecoration(
+            color: (onPressed == null && !isLoading) 
+                ? AppColors.disabled 
+                : backgroundColor,
+            gradient: ((onPressed != null || isLoading) && backgroundColor == null) 
+                ? AppColors.primaryGradient 
+                : null,
             borderRadius: BorderRadius.circular(radius),
           ),
-          textStyle: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
+          child: Center(
+            child: IconTheme(
+              data: IconThemeData(color: color),
+              child: DefaultTextStyle(
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+                child: _buildChild(fontSize, color),
+              ),
+            ),
           ),
         ),
-        child: _buildChild(fontSize, textColor ?? AppColors.textOnPrimary),
       ),
     );
   }
@@ -88,10 +114,7 @@ class AppButton extends StatelessWidget {
       return SizedBox(
         width: 24,
         height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          color: color,
-        ),
+        child: CircularProgressIndicator(strokeWidth: 2.5, color: color),
       );
     }
 
@@ -140,24 +163,26 @@ class AppGradientButton extends StatelessWidget {
             : const LinearGradient(
                 colors: [AppColors.disabled, AppColors.disabled],
               ),
-        borderRadius:
-            BorderRadius.circular(borderRadius ?? AppDimens.buttonRadius),
-        boxShadow: onPressed != null
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
+        borderRadius: BorderRadius.circular(
+          borderRadius ?? AppDimens.buttonRadius,
+        ),
+        // boxShadow: onPressed != null
+        //     ? [
+        //         BoxShadow(
+        //           color: AppColors.primary.withValues(alpha: 0.3),
+        //           blurRadius: 12,
+        //           offset: const Offset(0, 4),
+        //         ),
+        //       ]
+        //     : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: isLoading ? null : onPressed,
-          borderRadius:
-              BorderRadius.circular(borderRadius ?? AppDimens.buttonRadius),
+          borderRadius: BorderRadius.circular(
+            borderRadius ?? AppDimens.buttonRadius,
+          ),
           child: Center(
             child: isLoading
                 ? const SizedBox(

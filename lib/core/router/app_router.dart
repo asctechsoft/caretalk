@@ -16,6 +16,7 @@ import 'package:care_talk/features/chat/symptom_assessment_screen.dart';
 import 'package:care_talk/features/chat/request_success_screen.dart';
 import 'package:care_talk/features/chat/patient_doctor_chat_screen.dart';
 import 'package:care_talk/features/doctor_supplement_info/doctor_supplement_info_screen.dart';
+import 'package:care_talk/features/settings/settings_screen.dart';
 
 /// Quản lý routing cho toàn bộ ứng dụng
 class AppRouter {
@@ -38,6 +39,7 @@ class AppRouter {
   static const String requestSuccess = 'request-success';
   static const String patientDoctorChat = 'patient-doctor-chat';
   static const String doctorSupplementInfo = 'doctor-supplement-info';
+  static const String settings = 'settings';
 
   // ─── Route Paths ───────────────────────────────────────────────────
   static const String splashPath = '/';
@@ -56,6 +58,7 @@ class AppRouter {
   static const String requestSuccessPath = '/request-success';
   static const String patientDoctorChatPath = '/patient-doctor-chat';
   static const String doctorSupplementInfoPath = '/doctor-supplement-info';
+  static const String settingsPath = '/settings';
 
   // ─── Navigator Key ─────────────────────────────────────────────────
   static final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -148,7 +151,12 @@ class AppRouter {
     GoRoute(
       path: patientChatPath,
       name: patientChat,
-      builder: (context, state) => const PatientChatScreen(),
+      builder: (context, state) {
+        final sessionIndexStr = state.uri.queryParameters['sessionIndex'];
+        final sessionIndex =
+            sessionIndexStr != null ? int.tryParse(sessionIndexStr) : null;
+        return PatientChatScreen(sessionIndex: sessionIndex);
+      },
     ),
     GoRoute(
       path: patientLandingPath,
@@ -181,6 +189,11 @@ class AppRouter {
       path: doctorSupplementInfoPath,
       name: doctorSupplementInfo,
       builder: (context, state) => const DoctorSupplementInfoScreen(),
+    ),
+    GoRoute(
+      path: settingsPath,
+      name: settings,
+      builder: (context, state) => const SettingsScreen(),
     ),
   ];
 }

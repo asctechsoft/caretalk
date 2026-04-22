@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service quản lý local storage (SharedPreferences)
@@ -17,10 +19,12 @@ class StorageService {
   static const String _keyUserId = 'user_id';
   static const String _keyUserName = 'user_name';
   static const String _keyUserEmail = 'user_email';
+  static const String _keyUserRole = 'user_role';
   static const String _keyIsLoggedIn = 'is_logged_in';
   static const String _keyIsFirstLaunch = 'is_first_launch';
   static const String _keyThemeMode = 'theme_mode';
   static const String _keyLanguage = 'language';
+  static const String _keyChatHistory = 'chat_history';
 
   // ═══════════════════════════════════════════════════════════════════
   // TOKEN MANAGEMENT
@@ -60,11 +64,13 @@ class StorageService {
     required String userId,
     required String userName,
     required String userEmail,
+    required String userRole,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyUserId, userId);
     await prefs.setString(_keyUserName, userName);
     await prefs.setString(_keyUserEmail, userEmail);
+    await prefs.setString(_keyUserRole, userRole);
   }
 
   Future<Map<String, String?>> getUserInfo() async {
@@ -73,7 +79,36 @@ class StorageService {
       'userId': prefs.getString(_keyUserId),
       'userName': prefs.getString(_keyUserName),
       'userEmail': prefs.getString(_keyUserEmail),
+      'userRole': prefs.getString(_keyUserRole),
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // CHAT HISTORY
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> saveChatHistory(List<Map<String, dynamic>> history) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyChatHistory, jsonEncode(history));
+  }
+
+  Future<List<Map<String, dynamic>>> getChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString(_keyChatHistory);
+    debugPrint(
+      'StorageService: Loading chat history. Found: ${jsonString != null}',
+    );
+    if (jsonString != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(jsonString);
+        debugPrint('StorageService: Decoded ${decoded.length} sessions');
+        return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      } catch (e) {
+        debugPrint('StorageService: Error decoding history: $e');
+        return [];
+      }
+    }
+    return [];
   }
 
   // ═══════════════════════════════════════════════════════════════════

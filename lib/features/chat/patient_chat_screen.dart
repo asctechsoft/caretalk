@@ -1,3 +1,4 @@
+import 'package:care_talk/core/widgets/app_button.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:care_talk/core/constants/app_colors.dart';
@@ -5,10 +6,14 @@ import 'package:care_talk/core/constants/app_dimens.dart';
 import 'package:care_talk/core/router/app_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:care_talk/core/services/api_service.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:care_talk/core/services/storage_service.dart';
 import 'dart:io';
 
 class PatientChatScreen extends StatefulWidget {
-  const PatientChatScreen({super.key});
+  final int? sessionIndex;
+  const PatientChatScreen({super.key, this.sessionIndex});
 
   @override
   State<PatientChatScreen> createState() => _PatientChatScreenState();
@@ -21,57 +26,83 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
   bool _isBotTyping = false;
   int _activeSessionIndex = -1;
   final ImagePicker _picker = ImagePicker();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _msgController = TextEditingController();
     _messages = _getInitialMessage();
-    _historySessions = [
-      {
-        'title': 'Đau nửa đầu và chóng mặt',
-        'time': '15 phút trước',
-        'messages': [
-          {'isBot': true, 'text': 'Chào bạn, tôi là CareTalk. Tôi có thể giúp gì cho bạn hôm nay?', 'type': 'text'},
-          {'isBot': false, 'text': 'Tôi bị đau nửa đầu và chóng mặt', 'type': 'text'},
-          {'isBot': true, 'text': 'Tôi đã ghi nhận. Bạn bị lâu chưa?', 'type': 'text'},
-        ]
-      },
-      {
-        'title': 'Sốt nhẹ và ho khan',
-        'time': 'Hôm qua',
-        'messages': [
-          {'isBot': true, 'text': 'Chào bạn, tôi là CareTalk...', 'type': 'text'},
-          {'isBot': false, 'text': 'Tôi bị sốt nhẹ', 'type': 'text'},
-        ]
-      },
-    ];
+    _historySessions = [];
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    debugPrint('--- LOAD HISTORY ---');
+    debugPrint('widget.sessionIndex: ${widget.sessionIndex}');
+    final history = await StorageService().getChatHistory();
+    debugPrint('History count: ${history.length}');
+    
+    if (mounted) {
+      setState(() {
+        _historySessions = history;
+        if (widget.sessionIndex != null &&
+            widget.sessionIndex! >= 0 &&
+            widget.sessionIndex! < _historySessions.length) {
+          _activeSessionIndex = widget.sessionIndex!;
+          _messages = List<Map<String, dynamic>>.from(
+              _historySessions[_activeSessionIndex]['messages']);
+          debugPrint('Loaded session at index $_activeSessionIndex with ${_messages.length} messages');
+        } else {
+          debugPrint('No sessionIndex provided or index out of bounds');
+        }
+      });
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _saveHistory() async {
+    await StorageService().saveChatHistory(_historySessions);
   }
 
   List<Map<String, dynamic>> _getInitialMessage() {
     return [
       {
         'isBot': true,
-        'text': 'Chào bạn, tôi là CareTalk.\nTôi có thể giúp gì cho bạn hôm nay?',
+        'text':
+            'Chào bạn, tôi là CareTalk.\nTôi có thể giúp gì cho bạn hôm nay?',
         'type': 'text',
-      }
+      },
     ];
   }
 
   @override
   void dispose() {
     _msgController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _sendMessage() async {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
 
     setState(() {
       _messages.add({'isBot': false, 'text': text, 'type': 'text'});
       _msgController.clear();
-      
+
       // Tạo bản ghi lịch sử ngay khi hỏi câu đầu tiên
       if (_activeSessionIndex == -1) {
         final title = text.length > 25 ? '${text.substring(0, 25)}...' : text;
@@ -83,41 +114,54 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         _activeSessionIndex = 0;
       } else {
         // Cập nhật tin nhắn vào session hiện tại
-        _historySessions[_activeSessionIndex]['messages'] = List<Map<String, dynamic>>.from(_messages);
+        _historySessions[_activeSessionIndex]['messages'] =
+            List<Map<String, dynamic>>.from(_messages);
       }
-      
+
       _isBotTyping = true;
+      _scrollToBottom();
     });
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
+    _saveHistory(); // Lưu lại lịch sử vào storage
+
+    try {
+      debugPrint('--- GỌI API CHATBOT ---');
+      final stream = ApiService().sendChatMessageStream(text);
+
+      // Chuẩn bị một tin nhắn trống cho bot để hiển thị typing effect
       setState(() {
-        _isBotTyping = false;
-        _messages.add({
-          'isBot': true,
-          'text': 'Tôi đã ghi nhận triệu chứng của bạn. Dựa trên phân tích AI, tôi có một bản đánh giá sức khỏe sơ bộ cho bạn.',
-          'type': 'text',
-        });
-
-        String severity = 'low';
-        if (text.toLowerCase().contains('đau ngực') || text.toLowerCase().contains('khó thở')) {
-          severity = 'emergency';
-        } else if (text.toLowerCase().contains('đau') || text.toLowerCase().contains('sốt')) {
-          severity = 'moderate';
-        }
-
-        _messages.add({
-          'isBot': true,
-          'type': 'assessment',
-          'severity': severity,
-        });
-
-        // Cập nhật lại lịch sử sau khi bot trả lời
-        if (_activeSessionIndex != -1) {
-          _historySessions[_activeSessionIndex]['messages'] = List<Map<String, dynamic>>.from(_messages);
-        }
+        _isBotTyping = false; // Tắt indicator vì ta sẽ hiện chữ gõ
+        _messages.add({'isBot': true, 'text': '', 'type': 'text'});
       });
-    });
+      final botMsgIndex = _messages.length - 1;
+
+      await for (final chunk in stream) {
+        debugPrint('STREAM CHUNK (Parsed): $chunk');
+
+        setState(() {
+          // Nối thêm text mới vào
+          _messages[botMsgIndex]['text'] =
+              _messages[botMsgIndex]['text'] + chunk;
+
+          // Cập nhật lịch sử
+          if (_activeSessionIndex != -1) {
+            _historySessions[_activeSessionIndex]['messages'] =
+                List<Map<String, dynamic>>.from(_messages);
+          }
+        });
+        _scrollToBottom();
+      }
+      debugPrint('--- KẾT THÚC STREAM ---');
+      await _saveHistory(); // Lưu lịch sử sau khi bot trả lời xong
+    } catch (e) {
+      debugPrint('LỖI GỌI API: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBotTyping = false;
+        });
+      }
+    }
   }
 
   void _startNewChat() {
@@ -129,21 +173,34 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
   }
 
   void _loadSession(int index) {
-    setState(() {
-      _activeSessionIndex = index;
-      _messages = List<Map<String, dynamic>>.from(_historySessions[index]['messages']);
-    });
+    debugPrint('--- LOADING SESSION AT INDEX: $index ---');
+    if (index >= 0 && index < _historySessions.length) {
+      setState(() {
+        _activeSessionIndex = index;
+        _messages = List<Map<String, dynamic>>.from(
+          _historySessions[index]['messages'],
+        );
+        debugPrint('Session loaded: ${_messages.length} messages');
+      });
+      _scrollToBottom();
+    } else {
+      debugPrint('ERROR: Index $index out of bounds for history (length: ${_historySessions.length})');
+    }
     Navigator.pop(context);
   }
 
   Future<void> _pickImage() async {
     // Yêu cầu quyền truy cập thư viện ảnh
     var status = await Permission.photos.request();
-    
+
     if (status.isDenied) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng cấp quyền truy cập ảnh để sử dụng tính năng này')),
+        const SnackBar(
+          content: Text(
+            'Vui lòng cấp quyền truy cập ảnh để sử dụng tính năng này',
+          ),
+        ),
       );
       return;
     }
@@ -154,7 +211,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     }
 
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    
+
     if (image != null) {
       setState(() {
         _messages.add({
@@ -162,7 +219,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
           'type': 'image',
           'imagePath': image.path,
         });
-        
+
         // Cập nhật lịch sử
         if (_activeSessionIndex == -1) {
           _historySessions.insert(0, {
@@ -172,9 +229,10 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
           });
           _activeSessionIndex = 0;
         } else {
-          _historySessions[_activeSessionIndex]['messages'] = List<Map<String, dynamic>>.from(_messages);
+          _historySessions[_activeSessionIndex]['messages'] =
+              List<Map<String, dynamic>>.from(_messages);
         }
-        
+
         _isBotTyping = true;
       });
 
@@ -185,12 +243,16 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
           _isBotTyping = false;
           _messages.add({
             'isBot': true,
-            'text': 'Tôi đã nhận được hình ảnh của bạn. Trông có vẻ như một tình trạng da liễu thông thường, nhưng tôi cần thêm một vài thông tin...',
+            'text':
+                'Tôi đã nhận được hình ảnh của bạn. Trông có vẻ như một tình trạng da liễu thông thường, nhưng tôi cần thêm một vài thông tin...',
             'type': 'text',
           });
-          _historySessions[_activeSessionIndex]['messages'] = List<Map<String, dynamic>>.from(_messages);
+          _historySessions[_activeSessionIndex]['messages'] =
+              List<Map<String, dynamic>>.from(_messages);
         });
+        _saveHistory();
       });
+      _saveHistory(); // Save immediately after user sends image
     }
   }
 
@@ -203,61 +265,133 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         elevation: 0,
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: AppColors.primary),
-            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: AppColors.textPrimary,
+              size: 20,
+            ),
+            onPressed: () => context.pop(),
           ),
         ),
         title: const Text(
-          'CareTalk',
+          'Trò chuyện cùng CareTalk',
           style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 22),
-        ),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundImage: NetworkImage(
-                  'https://ui-avatars.com/api/?name=User&background=random'),
-            ),
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
-        ],
+        ),
       ),
       drawer: Drawer(
         width: MediaQuery.of(context).size.width * 0.8,
         child: Column(
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(color: AppColors.primary),
-              child: Center(
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  context.pop();
+                  context.push('${AppRouter.loginPath}?role=patient');
+                },
+                child: Ink(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 16,
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                  ),
+                  decoration: const BoxDecoration(color: AppColors.primary),
+                  child: GestureDetector(
+                    onTap: () {
+                      context.pop();
+                      context.push('${AppRouter.loginPath}?role=patient');
+                    },
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Đăng nhập',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Đăng nhập để trao đổi với bác sĩ',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                                maxLines: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.textPrimary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.medical_services_rounded,
-                          color: Colors.white),
+                      child: const Icon(
+                        Icons.history,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     const Text(
                       'Lịch sử tư vấn',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
+              child: Divider(),
+            ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                 itemCount: _historySessions.length,
                 itemBuilder: (context, index) {
                   final session = _historySessions[index];
@@ -273,14 +407,23 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.add_circle_outline, color: AppColors.primary),
-              title: const Text('Cuộc hội thoại mới', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(
+                Icons.add_circle_outline,
+                color: AppColors.primary,
+              ),
+              title: const Text(
+                'Cuộc hội thoại mới',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               onTap: _startNewChat,
             ),
             ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Cài đặt'),
-              onTap: () {},
+              leading: const Icon(Icons.logout_outlined),
+              title: const Text('Thoát chế độ'),
+              onTap: () {
+                context.pop();
+                context.push(AppRouter.onboardingPath);
+              },
             ),
             const SizedBox(height: 20),
           ],
@@ -290,19 +433,23 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         children: [
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(AppDimens.lg),
+              controller: _scrollController,
+              padding: const EdgeInsets.all(AppDimens.md),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               itemCount: _messages.length + (_isBotTyping ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == _messages.length) {
                   return _buildTypingIndicator();
                 }
                 final msg = _messages[index];
-                
+
                 // Nếu là tin nhắn đầu tiên của bot và chưa có hội thoại, hiện UI chào mừng
-                if (index == 0 && _messages.length == 1 && msg['isBot'] == true) {
+                if (index == 0 &&
+                    _messages.length == 1 &&
+                    msg['isBot'] == true) {
                   return _buildWelcomeScene();
                 }
-                
+
                 if (msg['type'] == 'assessment') {
                   return _buildAssessmentCard(msg['severity'] ?? 'low');
                 }
@@ -310,8 +457,6 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               },
             ),
           ),
-          
-
 
           _buildInputSection(),
         ],
@@ -324,17 +469,17 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: isBot ? MainAxisAlignment.start : MainAxisAlignment.end,
+        mainAxisAlignment: isBot
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (isBot) ...[
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 16),
+            Image.asset(
+              'assets/images/img_logo.png',
+              fit: BoxFit.contain,
+              width: 30,
+              height: 30,
             ),
             const SizedBox(width: 8),
           ],
@@ -358,21 +503,35 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                 ],
               ),
               child: msg['type'] == 'image'
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(msg['imagePath']),
-                      width: 200,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : Text(
-                    msg['text'] ?? '',
-                    style: TextStyle(
-                      color: isBot ? Colors.black87 : Colors.white,
-                      fontSize: 14,
-                    ),
-                  ),
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(msg['imagePath']),
+                        width: 200,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : (isBot
+                      ? MarkdownBody(
+                          data: msg['text'] ?? '',
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 14,
+                            ),
+                            listBullet: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 14,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          msg['text'] ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        )),
             ),
           ),
         ],
@@ -445,7 +604,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                context.push('${AppRouter.symptomAssessmentPath}?severity=$severity');
+                context.push(
+                  '${AppRouter.symptomAssessmentPath}?severity=$severity',
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: cardColor,
@@ -469,8 +630,14 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         children: [
           Icon(Icons.smart_toy_rounded, color: AppColors.primary, size: 20),
           SizedBox(width: 8),
-          Text('CareTalk đang phân tích...',
-              style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
+          Text(
+            'CareTalk đang phân tích...',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ],
       ),
     );
@@ -499,7 +666,11 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.image_outlined, color: AppColors.primary, size: 28),
+            icon: const Icon(
+              Icons.image_outlined,
+              color: AppColors.primary,
+              size: 28,
+            ),
             onPressed: _pickImage,
           ),
           const SizedBox(width: 8),
@@ -512,6 +683,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               ),
               child: TextField(
                 controller: _msgController,
+                onTap: () {
+                  Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
+                },
                 maxLines: null,
                 minLines: 1,
                 keyboardType: TextInputType.multiline,
@@ -546,7 +720,11 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 24),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
           ),
         ],
@@ -560,31 +738,21 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       children: [
         const SizedBox(height: 20),
         // Bot Icon
-        Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(
-            color: Color(0xFF1E56C1),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 32),
+        Image.asset(
+          'assets/images/img_logo.png',
+          fit: BoxFit.contain,
+          width: 60,
+          height: 60,
         ),
-        const SizedBox(height: 20),
-        
+        const SizedBox(height: 16),
+
         // Greeting Card
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -599,7 +767,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               Text(
                 'Chào bạn, tôi là\nCareTalk.',
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF1A1A1A),
                   height: 1.2,
@@ -609,7 +777,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               Text(
                 'Tôi có thể giúp gì cho bạn hôm nay?',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: Colors.black54,
                   fontWeight: FontWeight.w500,
                 ),
@@ -617,8 +785,8 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 32),
-        
+        const SizedBox(height: 24),
+
         // Suggestion Chips
         Wrap(
           spacing: 12,
@@ -630,7 +798,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
           ],
         ),
         const SizedBox(height: 40),
-        
+
         // Tip Card
         _buildTipCard(),
         const SizedBox(height: 20),
@@ -686,7 +854,11 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.lightbulb_outline_rounded, color: AppColors.primary, size: 24),
+            child: const Icon(
+              Icons.lightbulb_outline_rounded,
+              color: AppColors.primary,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 16),
           const Expanded(
@@ -718,9 +890,19 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     );
   }
 
-  Widget _buildHistoryItem(int index, String title, String time, IconData icon, {bool isActive = false}) {
+  Widget _buildHistoryItem(
+    int index,
+    String title,
+    String time,
+    IconData icon, {
+    bool isActive = false,
+  }) {
     return ListTile(
-      leading: Icon(icon, color: isActive ? AppColors.primary : Colors.grey, size: 20),
+      leading: Icon(
+        icon,
+        color: isActive ? AppColors.primary : Colors.grey,
+        size: 20,
+      ),
       title: Text(
         title,
         style: TextStyle(

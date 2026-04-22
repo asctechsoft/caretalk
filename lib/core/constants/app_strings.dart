@@ -26,8 +26,9 @@ class AppStrings {
   static const String onboardingStart = 'Bắt đầu';
   static const String onboardingTitle = 'Tư vấn sức khỏe ban đầu an toàn';
   static const String onboardingSubtitle = 'Kết nối bác sĩ tình nguyện khi cần';
-  static const String onboardingFooter = 'Vui lòng đọc kỹ điều khoản trước khi sử dụng';
-  static const String appNameAlt = 'Clinic AI';
+  static const String onboardingFooter =
+      'Vui lòng đọc kỹ điều khoản trước khi sử dụng';
+  static const String appNameAlt = 'CareTalk';
 
   // ─── Auth ──────────────────────────────────────────────────────────
   static const String loginTitle = 'Đăng nhập';
@@ -85,12 +86,12 @@ class AppStrings {
   static const String errorGeneral = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
   static const String errorNetwork =
       'Không có kết nối mạng. Vui lòng kiểm tra lại.';
-  static const String errorTimeout =
-      'Yêu cầu quá thời gian. Vui lòng thử lại.';
+  static const String errorTimeout = 'Yêu cầu quá thời gian. Vui lòng thử lại.';
 
   // ─── Doctor Supplement Info ─────────────────────────────────────────
   static const String doctorSupplementTitle = 'Bổ sung thông tin';
-  static const String doctorSupplementSubtitle = 'Vui lòng hoàn thiện hồ sơ để bắt đầu hỗ trợ bệnh nhân';
+  static const String doctorSupplementSubtitle =
+      'Vui lòng hoàn thiện hồ sơ để bắt đầu hỗ trợ bệnh nhân';
   static const String sectionPersonalInfo = 'Thông tin cá nhân';
   static const String sectionProfessionalInfo = 'Thông tin chuyên môn';
   static const String birthYear = 'Năm sinh';

@@ -1,4 +1,4 @@
-package com.caretalk.care_talk
+package com.company.care_talk
 
 import io.flutter.embedding.android.FlutterActivity
 

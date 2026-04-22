@@ -4,15 +4,42 @@ import 'package:care_talk/core/constants/app_dimens.dart';
 import 'package:care_talk/core/widgets/app_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:care_talk/core/router/app_router.dart';
+import 'package:provider/provider.dart';
+import 'package:care_talk/providers/auth_provider.dart';
 
-class PatientHomeScreen extends StatelessWidget {
+import 'package:care_talk/core/services/storage_service.dart';
+
+class PatientHomeScreen extends StatefulWidget {
   const PatientHomeScreen({super.key});
+
+  @override
+  State<PatientHomeScreen> createState() => _PatientHomeScreenState();
+}
+
+class _PatientHomeScreenState extends State<PatientHomeScreen> {
+  List<Map<String, dynamic>> _historySessions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await StorageService().getChatHistory();
+    if (mounted) {
+      setState(() {
+        _historySessions = history;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
               'assets/images/img_logo.png',
@@ -125,7 +152,7 @@ class PatientHomeScreen extends StatelessWidget {
                     textColor: AppColors.primary,
                     onPressed: () {
                       // Đi tới màn hình chat cho bệnh nhân
-                      context.push('/patient-chat');
+                      context.push('/patient-chat').then((_) => _loadHistory());
                     },
                   ),
                 ],
@@ -134,11 +161,11 @@ class PatientHomeScreen extends StatelessWidget {
             const SizedBox(height: 32),
 
             // Grid of other features
-            const Text(
-              'Tiện ích khác',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
+            // const Text(
+            //   'Tiện ích khác',
+            //   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // ),
+            // const SizedBox(height: 16),
             // GridView.count(
             //   crossAxisCount: 2,
             //   shrinkWrap: true,
@@ -183,76 +210,213 @@ class PatientHomeScreen extends StatelessWidget {
       width: MediaQuery.of(context).size.width * 0.8,
       child: Column(
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: AppColors.primary),
-            child: Center(
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, _) {
+              final user = authProvider.currentUser;
+              final isLoggedIn = authProvider.isLoggedIn;
+
+              debugPrint('--- USER LOG ---');
+              debugPrint('isLoggedIn: $isLoggedIn');
+              debugPrint('Name: ${user?.fullName}');
+              debugPrint('Email: ${user?.email}');
+              debugPrint('Role: ${user?.role}');
+              debugPrint('----------------');
+
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    if (!isLoggedIn) {
+                      context.pop();
+                      context.push('${AppRouter.loginPath}?role=patient');
+                    } else {
+                      context.pop();
+                      context.push(AppRouter.settingsPath);
+                    }
+                  },
+                  child: Ink(
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 16,
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
                     ),
-                    child: const Icon(
-                      Icons.medical_services_rounded,
-                      color: Colors.white,
+                    decoration: const BoxDecoration(color: AppColors.primary),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: isLoggedIn
+                              ? Center(
+                                  child: Text(
+                                    user?.fullName.isNotEmpty == true
+                                        ? user!.fullName[0].toUpperCase()
+                                        : 'U',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isLoggedIn
+                                    ? (user?.fullName ?? '')
+                                    : 'Đăng nhập',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isLoggedIn
+                                    ? (user?.email ?? '')
+                                    : 'Đăng nhập để trao đổi với bác sĩ',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontSize: 12,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 8),
+
+          Center(
+            child: InkWell(
+              onTap: () {
+                context.pop();
+                context
+                    .push(AppRouter.patientChatPath)
+                    .then((_) => _loadHistory());
+              },
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.add_circle_outline,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Tạo chat mới',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
+            child: Divider(),
+          ),
+
+          const SizedBox(height: 8),
+
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.history, color: AppColors.textPrimary),
                   const SizedBox(width: 16),
                   const Text(
                     'Lịch sử tư vấn',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                _buildHistoryItem(
-                  'Đau nửa đầu và chóng mặt',
-                  '15 phút trước',
-                  Icons.history_rounded,
-                ),
-                _buildHistoryItem(
-                  'Sốt nhẹ và ho khan',
-                  'Hôm qua',
-                  Icons.history_rounded,
-                ),
-                _buildHistoryItem(
-                  'Đau dạ dày cấp tính',
-                  '3 ngày trước',
-                  Icons.history_rounded,
-                ),
-              ],
-            ),
+            child: _historySessions.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Chưa có lịch sử',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _historySessions.length,
+                    itemBuilder: (context, index) {
+                      final session = _historySessions[index];
+                      return _buildHistoryItem(
+                        session['title'] ?? 'Cuộc hội thoại',
+                        session['time'] ?? 'Gần đây',
+                        Icons.history_rounded,
+                        onTap: () {
+                          debugPrint('--- BẤM VÀO LỊCH SỬ: Index $index ---');
+                          context.pop(); // Đóng drawer
+                          context
+                              .pushNamed(
+                                AppRouter.patientChat,
+                                queryParameters: {
+                                  'sessionIndex': index.toString(),
+                                },
+                              )
+                              .then((_) => _loadHistory());
+                        },
+                      );
+                    },
+                  ),
           ),
           const Divider(),
-          ListTile(
-            leading: const Icon(
-              Icons.add_circle_outline,
-              color: AppColors.primary,
-            ),
-            title: const Text(
-              'Tư vấn mới',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              context.push('/patient-chat');
-            },
-          ),
+
           ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: const Text('Cài đặt'),
-            onTap: () {},
+            onTap: () {
+              context.pop();
+              context.push(AppRouter.settingsPath);
+            },
           ),
           const SizedBox(height: 20),
         ],
@@ -260,7 +424,12 @@ class PatientHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHistoryItem(String title, String time, IconData icon) {
+  Widget _buildHistoryItem(
+    String title,
+    String time,
+    IconData icon, {
+    VoidCallback? onTap,
+  }) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey, size: 20),
       title: Text(
@@ -268,7 +437,7 @@ class PatientHomeScreen extends StatelessWidget {
         style: const TextStyle(fontSize: 14, color: Colors.black87),
       ),
       subtitle: Text(time, style: const TextStyle(fontSize: 12)),
-      onTap: () {},
+      onTap: onTap,
     );
   }
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "808655254753",
+    "project_id": "caretalk-5efcb",
+    "storage_bucket": "caretalk-5efcb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:808655254753:android:f09b5b07f3cb750f30f3a0",
+        "android_client_info": {
+          "package_name": "com.company.care_talk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKCDJh5fqSco8DRVy7IPNTsT1zSVbmWA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
