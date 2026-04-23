@@ -6,8 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:care_talk/core/router/app_router.dart';
 import 'package:provider/provider.dart';
 import 'package:care_talk/providers/auth_provider.dart';
-
 import 'package:care_talk/core/services/storage_service.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PatientHomeScreen extends StatefulWidget {
   const PatientHomeScreen({super.key});
@@ -26,7 +27,33 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   }
 
   Future<void> _loadHistory() async {
-    final history = await StorageService().getChatHistory();
+    List<Map<String, dynamic>> history = [];
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
+    if (firebaseUser != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('chat_sessions')
+            .doc(firebaseUser.uid)
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final sessions = doc.data()!['sessions'];
+          if (sessions != null) {
+            history = List<Map<String, dynamic>>.from(
+              (sessions as List).map((e) => Map<String, dynamic>.from(e)),
+            );
+          }
+        } else {
+          history = await StorageService().getChatHistory();
+        }
+      } catch (e) {
+        debugPrint('❌ Lỗi load Firestore HomeScreen: $e');
+        history = await StorageService().getChatHistory();
+      }
+    } else {
+      history = await StorageService().getChatHistory();
+    }
+
     if (mounted) {
       setState(() {
         _historySessions = history;
@@ -125,10 +152,9 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               ),
               child: Column(
                 children: [
-                  const Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    size: 64,
-                    color: Colors.white,
+                  Image.asset(
+                    'assets/images/img_home_benh_nhan.png',
+                    height: 80,
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -140,12 +166,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Tư vấn trực tuyến về các triệu chứng và thông tin y khoa',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 20),
+
                   AppButton(
                     text: 'Bắt đầu chat ngay',
                     backgroundColor: Colors.white,
@@ -159,7 +180,99 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               ),
             ),
             const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.all(AppDimens.lg),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(AppDimens.radiusLg),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tạo yêu cầu tới Bác sĩ',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Trao đổi trực tiếp với Bác sĩ chuyên khoa',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 20),
+                  AppButton(
+                    text: 'Yêu cầu Bác sĩ',
+                    backgroundColor: Colors.white,
+                    textColor: AppColors.primary,
+                    onPressed: () async {
+                      // Show loading dialog
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) =>
+                            const Center(child: CircularProgressIndicator()),
+                      );
 
+                      try {
+                        final auth = context.read<AuthProvider>();
+                        final patientId = auth.currentUser?.id;
+                        if (patientId == null)
+                          throw Exception('Chưa đăng nhập');
+
+                        final requestId =
+                            'CT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+                        // Lưu vào Firestore collection 'consultations'
+                        await FirebaseFirestore.instance
+                            .collection('consultations')
+                            .add({
+                              'requestId': requestId,
+                              'patientId': patientId,
+                              'doctorId': '', // Để trống vì chưa có bác sĩ nhận
+                              'status': 'waiting',
+                              'specialty':
+                                  'Internal Medicine', // Có thể thêm UI chọn chuyên khoa sau
+                              'createdAt': FieldValue.serverTimestamp(),
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+
+                        // Đóng loading dialog
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                          _showConsultationSuccessDialog(
+                            context,
+                            requestId,
+                            'Internal Medicine',
+                          );
+                        }
+                      } catch (e) {
+                        // Đóng loading dialog
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Lỗi: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
             // Grid of other features
             // const Text(
             //   'Tiện ích khác',
@@ -231,7 +344,9 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                       context.push('${AppRouter.loginPath}?role=patient');
                     } else {
                       context.pop();
-                      context.push(AppRouter.settingsPath);
+                      // context.push(AppRouter.settingsPath);
+                      // Bấm vào đây tao muốn vào màn cập nhật profile của bệnh nhân
+                      context.push(AppRouter.patientInfoPath);
                     }
                   },
                   child: Ink(
@@ -277,7 +392,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                             children: [
                               Text(
                                 isLoggedIn
-                                    ? (user?.fullName ?? '')
+                                    ? (user?.fullName ?? 'User')
                                     : 'Đăng nhập',
                                 style: const TextStyle(
                                   color: Colors.white,
@@ -353,6 +468,46 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             child: Divider(),
           ),
 
+          SizedBox(height: 8),
+
+          Center(
+            child: InkWell(
+              onTap: () {
+                context.pop();
+                context.push(AppRouter.patientConsultationHistoryPath);
+              },
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.request_quote_rounded,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Yêu cầu với bác sĩ',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
+            child: Divider(),
+          ),
           const SizedBox(height: 8),
 
           Center(
@@ -411,11 +566,93 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           const Divider(),
 
           ListTile(
-            leading: const Icon(Icons.settings_outlined),
-            title: const Text('Cài đặt'),
-            onTap: () {
-              context.pop();
-              context.push(AppRouter.settingsPath);
+            leading: const Icon(Icons.logout_rounded, color: Colors.red),
+            title: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
+            onTap: () async {
+              final auth = context.read<AuthProvider>();
+              context.pop(); // Đóng drawer trước
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: const Text('Đăng xuất'),
+                  content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+                  actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  actions: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            child: InkWell(
+                              onTap: () => Navigator.pop(ctx, false),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Hủy',
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Material(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(8),
+                            child: InkWell(
+                              onTap: () => Navigator.pop(ctx, true),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Ink(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Đăng xuất',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true && context.mounted) {
+                await auth.logout();
+                if (context.mounted) {
+                  context.go(AppRouter.onboardingPath);
+                }
+              }
             },
           ),
           const SizedBox(height: 20),
@@ -607,6 +844,178 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showConsultationSuccessDialog(
+    BuildContext context,
+    String requestId,
+    String specialty,
+  ) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon Success
+              Container(
+                width: 80,
+                height: 80,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE2FBD7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF34C759),
+                  size: 48,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Tiêu đề
+              const Text(
+                'Yêu cầu đã được gửi!',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Mô tả
+              const Text(
+                'Bác sĩ sẽ phản hồi bạn trong giây lát. Vui lòng giữ kết nối.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Khung thông tin
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'MÃ YÊU CẦU',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '#$requestId',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'CHUYÊN KHOA',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          specialty,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.verified_user_rounded,
+                            color: Color(0xFF34C759),
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Yêu cầu của bạn đang được ưu tiên xử lý bởi đội ngũ chuyên gia trực ca.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Nút đóng
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Đóng',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

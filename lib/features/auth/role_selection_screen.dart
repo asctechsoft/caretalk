@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:care_talk/core/constants/app_colors.dart';
 import 'package:care_talk/core/constants/app_dimens.dart';
-import 'package:care_talk/core/router/app_router.dart';
 import 'package:care_talk/core/constants/app_assets.dart';
+import 'package:care_talk/core/constants/pref_const.dart';
+import 'package:care_talk/core/router/app_router.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -73,22 +75,27 @@ class RoleSelectionScreen extends StatelessWidget {
                   description: 'Tìm kiếm tư vấn và theo dõi sức khỏe',
                   icon: Icons.person_outline_rounded,
                   color: AppColors.primary,
-                  onTap: () {
-                    // Chuyển đến màn Landing cho bệnh nhân (Login/Register/Chat)
-                    context.push(AppRouter.patientLandingPath);
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString(PrefConst.roleAccount, 'patient');
+                    if (context.mounted) {
+                      context.push(AppRouter.patientLandingPath);
+                    }
                   },
                 ),
                 const SizedBox(height: 20),
 
-                // Clinic Staff Option
                 _RoleCard(
                   title: 'Bác sĩ / Nhân viên',
                   description: 'Quản lý và tư vấn cho bệnh nhân',
                   icon: Icons.medical_services_outlined,
                   color: AppColors.error,
-                  onTap: () {
-                    // Chuyển đến luồng nhân viên (Login)
-                    context.push('${AppRouter.loginPath}?role=staff');
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString(PrefConst.roleAccount, 'doctor');
+                    if (context.mounted) {
+                      context.push('${AppRouter.loginPath}?role=staff');
+                    }
                   },
                 ),
               ],

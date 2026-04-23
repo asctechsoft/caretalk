@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_talk/models/user_model.dart';
 import 'package:care_talk/core/services/storage_service.dart';
 import 'package:care_talk/core/services/firebase_service.dart';
+import 'package:care_talk/core/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
@@ -30,19 +31,63 @@ class AuthProvider extends ChangeNotifier {
   // INIT - Kiểm tra trạng thái đăng nhập khi mở app
   // ═══════════════════════════════════════════════════════════════════
   Future<void> init() async {
-    _isLoggedIn = await _storage.isLoggedIn();
-    if (_isLoggedIn) {
-      final userInfo = await _storage.getUserInfo();
-      if (userInfo['userId'] != null) {
+    // Ưu tiên kiểm tra Firebase Auth session thực sự
+    final firebaseUser = _auth.currentUser;
+
+    if (firebaseUser != null) {
+      // Firebase có session hợp lệ → load profile từ Firestore
+      _isLoggedIn = true;
+      try {
+        final userData = await _firebaseService.getDocument(
+          collection: 'users',
+          documentId: firebaseUser.uid,
+        );
+        if (userData != null) {
+          _currentUser = UserModel.fromJson(userData);
+        } else {
+          // Fallback nếu Firestore chưa có doc
+          _currentUser = UserModel(
+            id: firebaseUser.uid,
+            fullName: firebaseUser.displayName ?? '',
+            email: firebaseUser.email ?? '',
+            phone: '',
+            role: 'patient',
+          );
+        }
+      } catch (e) {
+        _logger.e('init() - load Firestore profile error: $e');
         _currentUser = UserModel(
-          id: userInfo['userId']!,
-          fullName: userInfo['userName'] ?? '',
-          email: userInfo['userEmail'] ?? '',
+          id: firebaseUser.uid,
+          fullName: firebaseUser.displayName ?? '',
+          email: firebaseUser.email ?? '',
           phone: '',
-          role: userInfo['userRole'] ?? 'patient',
+          role: 'patient',
         );
       }
+    } else {
+      // Firebase KHÔNG có session → fallback về StorageService
+      _isLoggedIn = await _storage.isLoggedIn();
+      if (_isLoggedIn) {
+        final userInfo = await _storage.getUserInfo();
+        if (userInfo['userId'] != null) {
+          _currentUser = UserModel(
+            id: userInfo['userId']!,
+            fullName: userInfo['userName'] ?? '',
+            email: userInfo['userEmail'] ?? '',
+            phone: '',
+            role: userInfo['userRole'] ?? 'patient',
+          );
+        }
+        // Không có Firebase session thực sự → coi như chưa đăng nhập
+        _logger.w(
+          'StorageService có session nhưng FirebaseAuth.currentUser = null. Cần đăng nhập lại!',
+        );
+        _isLoggedIn = false;
+        _currentUser = null;
+        await _storage.clearAll();
+      }
     }
+
     notifyListeners();
   }
 
@@ -75,6 +120,21 @@ class AuthProvider extends ChangeNotifier {
             userEmail: _currentUser!.email,
             userRole: _currentUser!.role,
           );
+        }
+
+        // Sync user với Backend Database (bất kể user có tồn tại trước chưa)
+        // Backend sẽ tự xử lý nếu đã tồn tại rồi
+        try {
+          await ApiService().registerFirebase(
+            firebaseUid: user.uid,
+            email: email,
+            phoneNumber: '',
+            role: _currentUser?.role ?? 'patient',
+            fullName: _currentUser?.fullName ?? user.displayName ?? '',
+          );
+          _logger.i('✅ Backend sync thành công cho user: ${user.uid}');
+        } catch (e) {
+          _logger.w('⚠️ Backend sync thất bại (có thể user đã tồn tại): $e');
         }
 
         await _storage.setLoggedIn(true);
@@ -115,6 +175,7 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     String phone = '',
+    String role = 'patient',
   }) async {
     _setLoading(true);
     _clearError();
@@ -133,7 +194,7 @@ class AuthProvider extends ChangeNotifier {
           fullName: fullName,
           email: email,
           phone: phone,
-          role: 'patient',
+          role: role,
           isProfileComplete: true,
         );
 
@@ -143,6 +204,27 @@ class AuthProvider extends ChangeNotifier {
           documentId: user.uid,
           data: newUser.toJson(),
         );
+
+        // Lưu thêm vào bảng account
+        await _firebaseService.createDocument(
+          collection: 'account',
+          documentId: user.uid,
+          data: newUser.toJson(),
+        );
+
+        // Sync user với Backend Database
+        try {
+          await ApiService().registerFirebase(
+            firebaseUid: user.uid,
+            email: email,
+            phoneNumber: phone,
+            role: role,
+            fullName: fullName,
+          );
+          _logger.i('✅ Backend sync thành công khi đăng ký: ${user.uid}');
+        } catch (e) {
+          _logger.w('⚠️ Backend sync thất bại khi đăng ký: $e');
+        }
 
         _setLoading(false);
         return true;

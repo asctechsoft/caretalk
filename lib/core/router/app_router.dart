@@ -17,6 +17,7 @@ import 'package:care_talk/features/chat/request_success_screen.dart';
 import 'package:care_talk/features/chat/patient_doctor_chat_screen.dart';
 import 'package:care_talk/features/doctor_supplement_info/doctor_supplement_info_screen.dart';
 import 'package:care_talk/features/settings/settings_screen.dart';
+import 'package:care_talk/features/home/patient_consultation_history_screen.dart';
 
 /// Quản lý routing cho toàn bộ ứng dụng
 class AppRouter {
@@ -40,6 +41,7 @@ class AppRouter {
   static const String patientDoctorChat = 'patient-doctor-chat';
   static const String doctorSupplementInfo = 'doctor-supplement-info';
   static const String settings = 'settings';
+  static const String patientConsultationHistory = 'patient-consultation-history';
 
   // ─── Route Paths ───────────────────────────────────────────────────
   static const String splashPath = '/';
@@ -59,6 +61,7 @@ class AppRouter {
   static const String patientDoctorChatPath = '/patient-doctor-chat';
   static const String doctorSupplementInfoPath = '/doctor-supplement-info';
   static const String settingsPath = '/settings';
+  static const String patientConsultationHistoryPath = '/patient-consultation-history';
 
   // ─── Navigator Key ─────────────────────────────────────────────────
   static final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -188,12 +191,21 @@ class AppRouter {
     GoRoute(
       path: doctorSupplementInfoPath,
       name: doctorSupplementInfo,
-      builder: (context, state) => const DoctorSupplementInfoScreen(),
+      builder: (context, state) {
+        final allowBack =
+            state.uri.queryParameters['allowBack'] == 'true';
+        return DoctorSupplementInfoScreen(allowBack: allowBack);
+      },
     ),
     GoRoute(
       path: settingsPath,
       name: settings,
       builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: patientConsultationHistoryPath,
+      name: patientConsultationHistory,
+      builder: (context, state) => const PatientConsultationHistoryScreen(),
     ),
   ];
 }

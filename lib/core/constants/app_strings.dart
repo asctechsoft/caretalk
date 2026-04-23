@@ -43,6 +43,8 @@ class AppStrings {
   static const String registerSubtitle = 'Tạo tài khoản mới';
   static const String registerFullName = 'Họ và tên';
   static const String registerPhone = 'Số điện thoại';
+  static const String registerRole = 'Vai trò';
+  static const String registerRoleDoctor = 'Bác sĩ';
   static const String registerButton = 'Đăng ký';
   static const String registerHasAccount = 'Đã có tài khoản? ';
   static const String registerLogin = 'Đăng nhập';

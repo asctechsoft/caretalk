@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:care_talk/core/services/storage_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// Interceptor xử lý authentication token
 class AuthInterceptor extends Interceptor {
@@ -8,11 +9,21 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(
-      RequestOptions options, RequestInterceptorHandler handler) async {
-    // Đọc token từ local storage
-    final token = await StorageService().getAccessToken();
-    if (token != null && token.isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer $token';
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    // Đọc token từ Firebase Auth
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final token = await user.getIdToken();
+        debugPrint('Firebase Token: $token');
+        if (token != null && token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+      }
+    } catch (e) {
+      _logger.e('Lỗi khi lấy Firebase Token: $e');
     }
     handler.next(options);
   }

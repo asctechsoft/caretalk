@@ -1,6 +1,6 @@
 {
-    "name": "care_talk",
-    "short_name": "care_talk",
+    "name": "CareTalk",
+    "short_name": "CareTalk",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

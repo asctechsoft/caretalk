@@ -69,8 +69,7 @@ class FirebaseService {
     required String documentId,
   }) async {
     try {
-      final doc =
-          await _firestore.collection(collection).doc(documentId).get();
+      final doc = await _firestore.collection(collection).doc(documentId).get();
       if (doc.exists) {
         return {'id': doc.id, ...doc.data()!};
       }
@@ -130,10 +129,7 @@ class FirebaseService {
 
       final snapshot = await query.get();
       return snapshot.docs
-          .map((doc) => {
-                'id': doc.id,
-                ...(doc.data() as Map<String, dynamic>),
-              })
+          .map((doc) => {'id': doc.id, ...(doc.data() as Map<String, dynamic>)})
           .toList();
     } catch (e) {
       _logger.e('Error getting documents from $collection: $e');
@@ -184,11 +180,9 @@ class FirebaseService {
     required String collection,
     required String documentId,
   }) {
-    return _firestore
-        .collection(collection)
-        .doc(documentId)
-        .snapshots()
-        .map((doc) {
+    return _firestore.collection(collection).doc(documentId).snapshots().map((
+      doc,
+    ) {
       if (doc.exists) {
         return {'id': doc.id, ...doc.data()!};
       }
@@ -239,12 +233,11 @@ class FirebaseService {
       query = query.limit(limit);
     }
 
-    return query.snapshots().map((snapshot) => snapshot.docs
-        .map((doc) => {
-              'id': doc.id,
-              ...(doc.data() as Map<String, dynamic>),
-            })
-        .toList());
+    return query.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => {'id': doc.id, ...(doc.data() as Map<String, dynamic>)})
+          .toList(),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -261,12 +254,11 @@ class FirebaseService {
         .collection('messages')
         .orderBy('timestamp', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...(doc.data()),
-                })
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...(doc.data())})
+              .toList(),
+        );
   }
 
   /// Gửi tin nhắn vào chat session
@@ -282,12 +274,12 @@ class FirebaseService {
           .doc(sessionId)
           .collection('messages')
           .add({
-        'message': message,
-        'sender_id': senderId,
-        'sender_type': senderType,
-        'timestamp': FieldValue.serverTimestamp(),
-        'is_read': false,
-      });
+            'message': message,
+            'sender_id': senderId,
+            'sender_type': senderType,
+            'timestamp': FieldValue.serverTimestamp(),
+            'is_read': false,
+          });
 
       // Cập nhật last_message trong session
       await _firestore.collection('chat_sessions').doc(sessionId).update({
@@ -314,12 +306,11 @@ class FirebaseService {
         .where('status', isEqualTo: 'waiting')
         .orderBy('created_at', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...(doc.data()),
-                })
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...(doc.data())})
+              .toList(),
+        );
   }
 }
 

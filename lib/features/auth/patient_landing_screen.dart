@@ -54,7 +54,7 @@ class PatientLandingScreen extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
 
               // Content Section
               Padding(

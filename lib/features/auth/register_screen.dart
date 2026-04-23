@@ -9,6 +9,8 @@ import 'package:care_talk/core/widgets/app_button.dart';
 import 'package:care_talk/core/widgets/app_text_field.dart';
 import 'package:care_talk/core/utils/validators.dart';
 import 'package:care_talk/providers/auth_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:care_talk/core/constants/pref_const.dart';
 
 /// Màn hình Đăng ký
 class RegisterScreen extends StatefulWidget {
@@ -39,15 +41,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final authProvider = context.read<AuthProvider>();
 
+    final prefs = await SharedPreferences.getInstance();
+    final savedRole = prefs.getString(PrefConst.roleAccount) ?? 'patient';
+
     final success = await authProvider.register(
       fullName: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
       phone: _phoneController.text.trim(),
+      role: savedRole,
     );
 
     if (mounted) {
       if (success) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(PrefConst.fullName, _nameController.text.trim());
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Đăng ký tài khoản thành công!'),
@@ -107,7 +116,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       height: 100,
                     ),
                   ),
-                  const SizedBox(height: 24),
                   Center(
                     child: const Text(
                       AppStrings.registerTitle,
@@ -130,18 +138,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // Full name
-                  // AppTextField(
-                  //   label: AppStrings.registerFullName,
-                  //   hint: 'Nguyễn Văn A',
-                  //   controller: _nameController,
-                  //   textInputAction: TextInputAction.next,
-                  //   prefixIcon: Icons.person_outline_rounded,
-                  //   validator: Validators.fullName,
-                  // ),
-                  // const SizedBox(height: 20),
+                  AppTextField(
+                    label: AppStrings.registerFullName,
+                    hint: 'Nguyễn Văn A',
+                    controller: _nameController,
+                    textInputAction: TextInputAction.next,
+                    prefixIcon: Icons.person_outline_rounded,
+                    validator: Validators.fullName,
+                  ),
+                  const SizedBox(height: 16),
 
                   // Email
                   AppTextField(
@@ -153,7 +161,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: Icons.email_outlined,
                     validator: Validators.email,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // // Phone
                   // AppTextField(
@@ -177,7 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: Icons.lock_outline_rounded,
                     validator: Validators.password,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
 
                   // Register button
                   Consumer<AuthProvider>(

@@ -5,6 +5,11 @@ import 'package:care_talk/core/constants/app_strings.dart';
 import 'package:care_talk/core/widgets/app_button.dart';
 import 'package:care_talk/core/widgets/app_text_field.dart';
 import 'package:care_talk/core/utils/validators.dart';
+import 'package:provider/provider.dart';
+import 'package:care_talk/providers/auth_provider.dart';
+import 'package:care_talk/core/services/firebase_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:care_talk/core/constants/pref_const.dart';
 
 /// Màn hình nhập thông tin bệnh nhân
 class PatientInfoScreen extends StatefulWidget {
@@ -24,6 +29,7 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
   final _addressCtrl = TextEditingController();
   final _symptomsCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _dobCtrl = TextEditingController();
 
   String _selectedGender = 'Nam';
   DateTime? _selectedDob;
@@ -34,6 +40,67 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Khởi tạo data người dùng hiện tại
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final savedFullName = prefs.getString(PrefConst.fullName);
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.currentUser;
+      if (user != null) {
+        setState(() {
+          _nameCtrl.text = (savedFullName != null && savedFullName.isNotEmpty)
+              ? savedFullName
+              : user.fullName;
+          _emailCtrl.text = user.email;
+          if (user.phone.isNotEmpty) {
+            _phoneCtrl.text = user.phone;
+          }
+        });
+
+        // Tải thêm các trường bổ sung từ Firestore (địa chỉ, ngày sinh, giới tính...)
+        final doc = await FirebaseService().getDocument(
+          collection: 'users',
+          documentId: user.id,
+        );
+        if (doc != null && mounted) {
+          setState(() {
+            if (doc['full_name'] != null &&
+                doc['full_name'].toString().isNotEmpty) {
+              if (savedFullName == null || savedFullName.isEmpty) {
+                _nameCtrl.text = doc['full_name'];
+              }
+            }
+            if (doc['address'] != null) _addressCtrl.text = doc['address'];
+            if (doc['symptoms'] != null) _symptomsCtrl.text = doc['symptoms'];
+            if (doc['note'] != null) _noteCtrl.text = doc['note'];
+
+            if (doc['date_of_birth'] != null) {
+              final dobParts = doc['date_of_birth'].toString().split('-');
+              if (dobParts.length == 3) {
+                _selectedDob = DateTime(
+                  int.parse(dobParts[0]),
+                  int.parse(dobParts[1]),
+                  int.parse(dobParts[2]),
+                );
+                _dobCtrl.text =
+                    '${_selectedDob!.day.toString().padLeft(2, '0')}/${_selectedDob!.month.toString().padLeft(2, '0')}/${_selectedDob!.year}';
+              }
+            }
+            if (doc['gender'] != null) {
+              if (doc['gender'] == 'MALE')
+                _selectedGender = 'Nam';
+              else if (doc['gender'] == 'FEMALE')
+                _selectedGender = 'Nữ';
+              else
+                _selectedGender = 'Khác';
+            }
+          });
+        }
+      }
+    });
+
     if (_isEditing) {
       // TODO: Load patient data from Firestore
     }
@@ -47,19 +114,24 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     _addressCtrl.dispose();
     _symptomsCtrl.dispose();
     _noteCtrl.dispose();
+    _dobCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _selectDate() async {
-    final date = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDob ?? DateTime(1990),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
       locale: const Locale('vi', 'VN'),
     );
-    if (date != null) {
-      setState(() => _selectedDob = date);
+    if (picked != null && picked != _selectedDob) {
+      setState(() {
+        _selectedDob = picked;
+        _dobCtrl.text =
+            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      });
     }
   }
 
@@ -68,13 +140,51 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Implement save to Firestore via PatientProvider
-    await Future.delayed(const Duration(seconds: 2));
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+
+    bool success = false;
+    if (user != null) {
+      final dobStr = _selectedDob != null
+          ? '${_selectedDob!.year}-${_selectedDob!.month.toString().padLeft(2, '0')}-${_selectedDob!.day.toString().padLeft(2, '0')}'
+          : '1990-01-15';
+
+      String genderEnum = 'OTHER';
+      if (_selectedGender == 'Nam') genderEnum = 'MALE';
+      if (_selectedGender == 'Nữ') genderEnum = 'FEMALE';
+
+      // Update local profile and Firestore directly
+      success = await authProvider.updateProfile({
+        'full_name': _nameCtrl.text,
+        'email': _emailCtrl.text,
+        'phone': _phoneCtrl.text,
+        'date_of_birth': dobStr,
+        'gender': genderEnum,
+        'address': _addressCtrl.text.isEmpty ? "Hà Nội" : _addressCtrl.text,
+        'symptoms': _symptomsCtrl.text,
+        'note': _noteCtrl.text,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    }
 
     setState(() => _isLoading = false);
 
     if (mounted) {
-      Navigator.pop(context);
+      if (success) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(PrefConst.fullName, _nameCtrl.text.trim());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cập nhật thông tin thành công!')),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ?? 'Cập nhật thất bại'),
+          ),
+        );
+      }
     }
   }
 
@@ -132,11 +242,7 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
                 hint: 'Chọn ngày sinh',
                 readOnly: true,
                 prefixIcon: Icons.calendar_today_outlined,
-                controller: TextEditingController(
-                  text: _selectedDob != null
-                      ? '${_selectedDob!.day.toString().padLeft(2, '0')}/${_selectedDob!.month.toString().padLeft(2, '0')}/${_selectedDob!.year}'
-                      : '',
-                ),
+                controller: _dobCtrl,
                 onTap: _selectDate,
                 suffixIcon: Icons.arrow_drop_down_rounded,
               ),
@@ -170,8 +276,9 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
                         color: isSelected
                             ? AppColors.primary
                             : AppColors.textSecondary,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                     ),
                   );
@@ -198,8 +305,7 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
                 controller: _symptomsCtrl,
                 maxLines: 3,
                 prefixIcon: Icons.medical_information_outlined,
-                validator: (value) =>
-                    Validators.required(value, 'Triệu chứng'),
+                validator: (value) => Validators.required(value, 'Triệu chứng'),
               ),
               const SizedBox(height: 16),
 

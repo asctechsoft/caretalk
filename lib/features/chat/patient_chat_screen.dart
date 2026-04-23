@@ -9,6 +9,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:care_talk/core/services/api_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:care_talk/core/services/storage_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 
 class PatientChatScreen extends StatefulWidget {
@@ -40,9 +42,43 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
   Future<void> _loadHistory() async {
     debugPrint('--- LOAD HISTORY ---');
     debugPrint('widget.sessionIndex: ${widget.sessionIndex}');
-    final history = await StorageService().getChatHistory();
+
+    List<Map<String, dynamic>> history = [];
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
+    if (firebaseUser != null) {
+      // ưu tiên load từ Firestore bảng chat_sessions theo userId
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('chat_sessions')
+            .doc(firebaseUser.uid)
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final sessions = doc.data()!['sessions'];
+          if (sessions != null) {
+            history = List<Map<String, dynamic>>.from(
+              (sessions as List).map((e) => Map<String, dynamic>.from(e)),
+            );
+            // Sync về local để dùng offline
+            await StorageService().saveChatHistory(history);
+            debugPrint('✅ Load từ Firestore chat_sessions: ${history.length} sessions');
+          }
+        } else {
+          history = await StorageService().getChatHistory();
+          debugPrint('ℹ️ Firestore chưa có dữ liệu, dùng local');
+        }
+      } catch (e) {
+        debugPrint('❌ Lỗi Firestore (chi tiết): $e');
+        history = await StorageService().getChatHistory();
+      }
+    } else {
+      // Chưa đăng nhập → chỉ dùng local
+      history = await StorageService().getChatHistory();
+      debugPrint('Chưa login, dùng local: ${history.length} sessions');
+    }
+
     debugPrint('History count: ${history.length}');
-    
+
     if (mounted) {
       setState(() {
         _historySessions = history;
@@ -51,8 +87,11 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             widget.sessionIndex! < _historySessions.length) {
           _activeSessionIndex = widget.sessionIndex!;
           _messages = List<Map<String, dynamic>>.from(
-              _historySessions[_activeSessionIndex]['messages']);
-          debugPrint('Loaded session at index $_activeSessionIndex with ${_messages.length} messages');
+            _historySessions[_activeSessionIndex]['messages'],
+          );
+          debugPrint(
+            'Loaded session at index $_activeSessionIndex with ${_messages.length} messages',
+          );
         } else {
           debugPrint('No sessionIndex provided or index out of bounds');
         }
@@ -62,7 +101,26 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
   }
 
   Future<void> _saveHistory() async {
+    // 1. Lưu local (luôn luôn)
     await StorageService().saveChatHistory(_historySessions);
+
+    // 2. Lưu lên Firestore nếu đã đăng nhập
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('chat_sessions')
+            .doc(firebaseUser.uid)
+            .set({
+          'user_id': firebaseUser.uid,
+          'sessions': _historySessions,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+        debugPrint('✅ Lưu Firestore chat_sessions thành công: ${_historySessions.length} sessions');
+      } catch (e) {
+        debugPrint('❌ Lỗi lưu Firestore (chi tiết): $e');
+      }
+    }
   }
 
   List<Map<String, dynamic>> _getInitialMessage() {
@@ -184,7 +242,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       });
       _scrollToBottom();
     } else {
-      debugPrint('ERROR: Index $index out of bounds for history (length: ${_historySessions.length})');
+      debugPrint(
+        'ERROR: Index $index out of bounds for history (length: ${_historySessions.length})',
+      );
     }
     Navigator.pop(context);
   }
@@ -512,26 +572,26 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                       ),
                     )
                   : (isBot
-                      ? MarkdownBody(
-                          data: msg['text'] ?? '',
-                          styleSheet: MarkdownStyleSheet(
-                            p: const TextStyle(
-                              color: Colors.black87,
+                        ? MarkdownBody(
+                            data: msg['text'] ?? '',
+                            styleSheet: MarkdownStyleSheet(
+                              p: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                              ),
+                              listBullet: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            msg['text'] ?? '',
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 14,
                             ),
-                            listBullet: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 14,
-                            ),
-                          ),
-                        )
-                      : Text(
-                          msg['text'] ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                        )),
+                          )),
             ),
           ),
         ],
@@ -684,7 +744,10 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               child: TextField(
                 controller: _msgController,
                 onTap: () {
-                  Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
+                  Future.delayed(
+                    const Duration(milliseconds: 300),
+                    _scrollToBottom,
+                  );
                 },
                 maxLines: null,
                 minLines: 1,

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:logger/logger.dart';
+import 'package:care_talk/core/services/storage_service.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -24,15 +25,34 @@ class ApiService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Luôn lấy Firebase ID Token mới nhất
           final user = FirebaseAuth.instance.currentUser;
           if (user != null) {
-            // Lấy idToken từ Firebase (tự động làm mới nếu hết hạn)
             final idToken = await user.getIdToken();
             if (idToken != null) {
               options.headers['Authorization'] = 'Bearer $idToken';
+              _logger.i(
+                '🔑 Đã đính kèm Token của user: ${user.uid} (Token bắt đầu bằng: ${idToken.substring(0, 15)}...)',
+              );
             }
+          } else {
+            _logger.w(
+              '⚠️ KHÔNG có user đăng nhập, không có token nào được đính kèm!',
+            );
           }
+
           _logger.i('API Request: [${options.method}] ${options.uri}');
+
+          // In ra cURL để copy test trên Terminal hoặc Postman
+          String curl =
+              'curl -X ${options.method} "${options.uri}" \\\n'
+              '  -H "Authorization: ${options.headers['Authorization']}" \\\n'
+              '  -H "Content-Type: application/json" \\\n'
+              '  -d \'${jsonEncode(options.data)}\'';
+          _logger.w(
+            '🚀 Thử chạy lệnh cURL này để xem lỗi 500 có xuất hiện không:\n$curl',
+          );
+
           return handler.next(options);
         },
         onResponse: (response, handler) {
@@ -90,7 +110,57 @@ class ApiService {
       }
     } catch (e) {
       _logger.e('Send Chat Stream Error: $e');
-      yield 'Lỗi kết nối máy chủ.';
+
+      // Fallback khi API lỗi để bạn vẫn test được UI
+      final mockResponse =
+          'Đây là phản hồi tự động (Do API đang báo lỗi 500). Hệ thống ghi nhận bạn có dấu hiệu cần theo dõi thêm. Vui lòng cung cấp chi tiết hơn.';
+      final words = mockResponse.split(' ');
+      for (var word in words) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        yield '$word ';
+      }
+    }
+  }
+
+  Future<bool> registerFirebase({
+    required String firebaseUid,
+    required String email,
+    required String phoneNumber,
+    required String role,
+    required String fullName,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/users/register-firebase',
+        data: {
+          "firebaseUid": firebaseUid,
+          "email": email,
+          "phoneNumber": phoneNumber,
+          "role": role.toUpperCase(),
+          "status": "ACTIVE",
+          "authProvider": "password",
+          "metadata": {
+            "displayName": fullName,
+            "dateOfBirth": "1990-01-15",
+            "gender": "MALE",
+            "address": "Hà Nội",
+          },
+        },
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      _logger.e('Register Firebase API Error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateProfile(Map<String, dynamic> body) async {
+    try {
+      final response = await _dio.put('/api/v1/users/me', data: body);
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      _logger.e('Update Profile Error: $e');
+      return false;
     }
   }
 }

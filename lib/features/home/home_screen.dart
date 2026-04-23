@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_talk/core/constants/app_colors.dart';
 import 'package:care_talk/core/constants/app_dimens.dart';
+import 'package:care_talk/core/constants/app_strings.dart';
+import 'package:care_talk/core/constants/pref_const.dart';
 import 'package:care_talk/core/router/app_router.dart';
+import 'package:care_talk/providers/auth_provider.dart';
+import 'package:care_talk/core/services/firebase_service.dart';
 
 /// Màn hình Home - Điều hướng chính
 class HomeScreen extends StatefulWidget {
@@ -15,6 +22,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  Future<Map<String, dynamic>?>? _doctorInfoFuture;
+  String? _cachedSpecialty; // read from local prefs
 
   // Biến cho tab Chat AI
   late TextEditingController _msgController;
@@ -33,55 +42,30 @@ class _HomeScreenState extends State<HomeScreen>
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Mock data cho danh sách bệnh nhân
-  final List<Map<String, dynamic>> _patients = [
-    {
-      'id': '1',
-      'name': 'Nguyễn Văn An',
-      'phone': '0912345678',
-      'symptom': 'Đau đầu, chóng mặt',
-      'status': 'waiting',
-      'time': '10:30',
-    },
-    {
-      'id': '2',
-      'name': 'Trần Thị Bình',
-      'phone': '0987654321',
-      'symptom': 'Ho kéo dài, sốt nhẹ',
-      'status': 'waiting',
-      'time': '10:45',
-    },
-    {
-      'id': '3',
-      'name': 'Lê Hoàng Cường',
-      'phone': '0909090909',
-      'symptom': 'Đau bụng, buồn nôn',
-      'status': 'in_progress',
-      'time': '09:15',
-    },
-    {
-      'id': '4',
-      'name': 'Phạm Minh Đức',
-      'phone': '0933333333',
-      'symptom': 'Mất ngủ, stress',
-      'status': 'completed',
-      'time': '08:00',
-    },
-    {
-      'id': '5',
-      'name': 'Hoàng Thị Em',
-      'phone': '0944444444',
-      'symptom': 'Đau răng, sưng nướu',
-      'status': 'waiting',
-      'time': '11:00',
-    },
-  ];
+  // Removed mock data
 
   @override
   void initState() {
     super.initState();
     _msgController = TextEditingController();
     _tabController = TabController(length: 3, vsync: this);
+    // Load doctor info
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final uid = context.read<AuthProvider>().currentUser?.id;
+      // 1. Đọc specialty từ local trước (nhanh)
+      final prefs = await SharedPreferences.getInstance();
+      final localSpecialty = prefs.getString(PrefConst.doctorSpecialty);
+      if (mounted) setState(() => _cachedSpecialty = localSpecialty);
+      // 2. Fetch isVerified từ Firestore (cần kết nối mạng)
+      if (uid != null) {
+        setState(() {
+          _doctorInfoFuture = FirebaseService().getDocument(
+            collection: 'doctors',
+            documentId: uid,
+          );
+        });
+      }
+    });
   }
 
   @override
@@ -92,17 +76,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _filterPatients(String status) {
-    return _patients
-        .where(
-          (p) =>
-              p['status'] == status &&
-              (_searchQuery.isEmpty ||
-                  p['name'].toLowerCase().contains(_searchQuery.toLowerCase())),
-        )
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen>
         index: _currentIndex,
         children: [
           _buildDashboard(),
-          _buildChatTab(),
+          // _buildChatTab(),
           _buildPatientTab(),
           _buildProfileTab(),
         ],
@@ -134,10 +107,10 @@ class _HomeScreenState extends State<HomeScreen>
               icon: Icon(Icons.dashboard_rounded),
               label: 'Tổng quan',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_rounded),
-              label: 'Chat',
-            ),
+            // BottomNavigationBarItem(
+            //   icon: Icon(Icons.chat_rounded),
+            //   label: 'Chat',
+            // ),
             BottomNavigationBarItem(
               icon: Icon(Icons.people_rounded),
               label: 'Bệnh nhân',
@@ -164,153 +137,149 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppDimens.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome card
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppDimens.lg),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(AppDimens.radiusLg),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Xin chào! 👋',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      color: AppColors.white.withValues(alpha: 0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Bác sĩ Nguyễn Văn A',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Bạn có 5 bệnh nhân đang chờ tư vấn',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 13,
-                      color: AppColors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('consultations')
+            .snapshots(),
+        builder: (context, snapshot) {
+          final currentUserId = context.watch<AuthProvider>().currentUser?.id;
+          final docs = snapshot.data?.docs ?? [];
 
-            // Quick actions
-            const Text(
-              'Thao tác nhanh',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickAction(
-                    icon: Icons.chat_rounded,
-                    label: 'Chat mới',
-                    color: AppColors.primary,
-                    onTap: () => context.push(AppRouter.chatPath),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickAction(
-                    icon: Icons.person_add_rounded,
-                    label: 'Thêm BN',
-                    color: AppColors.accent,
-                    onTap: () => context.push(AppRouter.patientInfoPath),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickAction(
-                    icon: Icons.list_alt_rounded,
-                    label: 'DS chờ',
-                    color: AppColors.warning,
-                    onTap: () => context.push(AppRouter.patientListPath),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+          final waitingCount = docs
+              .where(
+                (d) =>
+                    (d.data() as Map<String, dynamic>)['status'] == 'waiting',
+              )
+              .length;
+          final inProgressCount = docs.where((d) {
+            final data = d.data() as Map<String, dynamic>;
+            return data['status'] == 'accepted' &&
+                data['doctorId'] == currentUserId;
+          }).length;
+          final completedCount = docs.where((d) {
+            final data = d.data() as Map<String, dynamic>;
+            return data['status'] == 'completed' &&
+                data['doctorId'] == currentUserId;
+          }).length;
 
-            // Stats
-            const Text(
-              'Thống kê hôm nay',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(AppDimens.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _buildStatCard(
-                    label: 'Đang chờ',
-                    value: '5',
-                    color: AppColors.statusWaiting,
-                    icon: Icons.schedule_rounded,
+                // Welcome card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppDimens.lg),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(AppDimens.radiusLg),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Xin chào! 👋',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          color: AppColors.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Bác sĩ ${context.watch<AuthProvider>().currentUser?.fullName ?? ''}',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Bạn có $waitingCount bệnh nhân đang chờ tư vấn',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          color: AppColors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    label: 'Đang tư vấn',
-                    value: '2',
-                    color: AppColors.statusInProgress,
-                    icon: Icons.chat_bubble_rounded,
+                const SizedBox(height: 24),
+
+                // Quick actions
+
+                // Stats
+                const Text(
+                  'Thống kê hôm nay',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        label: 'Đang chờ',
+                        value: '$waitingCount',
+                        color: AppColors.statusWaiting,
+                        icon: Icons.schedule_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        label: 'Đang tư vấn',
+                        value: '$inProgressCount',
+                        color: AppColors.statusInProgress,
+                        icon: Icons.chat_bubble_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        label: 'Hoàn thành',
+                        value: '$completedCount',
+                        color: AppColors.statusCompleted,
+                        icon: Icons.check_circle_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FutureBuilder<AggregateQuerySnapshot>(
+                        future: FirebaseFirestore.instance
+                            .collection('users')
+                            .where('role', isEqualTo: 'patient')
+                            .count()
+                            .get(),
+                        builder: (context, userSnap) {
+                          final totalPatients = userSnap.data?.count ?? 0;
+                          return _buildStatCard(
+                            label: 'Tổng BN',
+                            value: '$totalPatients',
+                            color: AppColors.primary,
+                            icon: Icons.people_rounded,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    label: 'Hoàn thành',
-                    value: '12',
-                    color: AppColors.statusCompleted,
-                    icon: Icons.check_circle_rounded,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    label: 'Tổng BN',
-                    value: '19',
-                    color: AppColors.primary,
-                    icon: Icons.people_rounded,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -626,176 +595,151 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildPatientTab() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFE),
-      appBar: AppBar(
-        title: const Text('Danh sách bệnh nhân'),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.person_add_rounded,
-              color: AppColors.primary,
-            ),
-            onPressed: () => context.push(AppRouter.patientInfoPath),
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: AppColors.primary,
-          tabs: [
-            Tab(text: 'Đang chờ (${_filterPatients('waiting').length})'),
-            Tab(text: 'Đang tư vấn (${_filterPatients('in_progress').length})'),
-            Tab(text: 'Hoàn thành (${_filterPatients('completed').length})'),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                decoration: const InputDecoration(
-                  hintText: 'Tìm kiếm bệnh nhân...',
-                  border: InputBorder.none,
-                  icon: Icon(Icons.search, size: 20),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('consultations')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final currentUserId = context.watch<AuthProvider>().currentUser?.id;
+        final docs = snapshot.data?.docs ?? [];
+
+        final waitingCount = docs
+            .where(
+              (d) => (d.data() as Map<String, dynamic>)['status'] == 'waiting',
+            )
+            .length;
+        final inProgressCount = docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return data['status'] == 'accepted' &&
+              data['doctorId'] == currentUserId;
+        }).length;
+        final completedCount = docs.where((d) {
+          final data = d.data() as Map<String, dynamic>;
+          return data['status'] == 'completed' &&
+              data['doctorId'] == currentUserId;
+        }).length;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFFBFBFE),
+          appBar: AppBar(
+            title: const Text('Danh sách bệnh nhân'),
+            actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.person_add_rounded,
+                  color: AppColors.primary,
                 ),
+                onPressed: () => context.push(AppRouter.patientInfoPath),
               ),
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
+            ],
+            bottom: TabBar(
               controller: _tabController,
-              children: [
-                _buildPatientListView('waiting'),
-                _buildPatientListView('in_progress'),
-                _buildPatientListView('completed'),
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: AppColors.primary,
+              tabs: [
+                Tab(text: 'Đang chờ ($waitingCount)'),
+                Tab(text: 'Đang tư vấn ($inProgressCount)'),
+                Tab(text: 'Hoàn thành ($completedCount)'),
               ],
             ),
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push(AppRouter.patientInfoPath),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add_rounded, color: Colors.white),
-      ),
+          body: Column(
+            children: [
+              // Padding(
+              //   padding: const EdgeInsets.all(16.0),
+              //   child: Container(
+              //     padding: const EdgeInsets.symmetric(horizontal: 16),
+              //     decoration: BoxDecoration(
+              //       color: Colors.white,
+              //       borderRadius: BorderRadius.circular(12),
+              //       border: Border.all(color: Colors.grey.shade200),
+              //     ),
+              //     child: TextField(
+              //       controller: _searchController,
+              //       onChanged: (value) => setState(() => _searchQuery = value),
+              //       decoration: const InputDecoration(
+              //         hintText: 'Tìm kiếm bệnh nhân...',
+              //         border: InputBorder.none,
+              //         icon: Icon(Icons.search, size: 20),
+              //       ),
+              //     ),
+              //   ),
+              // ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildPatientListView('waiting', docs, currentUserId),
+                    _buildPatientListView('in_progress', docs, currentUserId),
+                    _buildPatientListView('completed', docs, currentUserId),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => context.push(AppRouter.patientInfoPath),
+            backgroundColor: AppColors.primary,
+            child: const Icon(Icons.add_rounded, color: Colors.white),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildPatientListView(String status) {
-    final list = _filterPatients(status);
-    if (list.isEmpty) {
+  Widget _buildPatientListView(
+    String status,
+    List<QueryDocumentSnapshot> allDocs,
+    String? currentUserId,
+  ) {
+    var filtered = allDocs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final docStatus = data['status'] ?? 'waiting';
+      final docDoctorId = data['doctorId'] ?? '';
+
+      String filterStatus = status == 'in_progress' ? 'accepted' : status;
+
+      if (filterStatus == 'waiting') {
+        return docStatus == 'waiting';
+      } else {
+        return docStatus == filterStatus && docDoctorId == currentUserId;
+      }
+    }).toList();
+
+    filtered.sort((a, b) {
+      final aTime =
+          (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+      final bTime =
+          (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime);
+    });
+
+    if (filtered.isEmpty) {
       return const Center(child: Text('Không có bệnh nhân nào'));
     }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: list.length,
-      itemBuilder: (context, index) => _buildPatientListCard(list[index]),
-    );
-  }
 
-  Widget _buildPatientListCard(Map<String, dynamic> patient) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-            child: Text(
-              patient['name'].substring(0, 2).toUpperCase(),
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      patient['name'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    _buildStatusStepBadge(patient['status']),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  patient['symptom'],
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.phone_outlined,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      patient['phone'],
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(
-                      Icons.schedule_outlined,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      patient['time'],
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(
-              Icons.chat_bubble_outline,
-              color: AppColors.primary,
-            ),
-            onPressed: () => context.push(AppRouter.chatPath),
-          ),
-        ],
-      ),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final data = filtered[index].data() as Map<String, dynamic>;
+        data['docId'] = filtered[index].id;
+        return _PatientListCardWidget(
+          consultationData: data,
+          searchQuery: _searchQuery,
+        );
+      },
     );
   }
 
@@ -840,12 +784,6 @@ class _HomeScreenState extends State<HomeScreen>
         title: const Text('Cá nhân'),
         backgroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppDimens.md),
@@ -879,9 +817,9 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Bác sĩ Nguyễn Văn A',
-                          style: TextStyle(
+                        Text(
+                          'Bác sĩ ${context.watch<AuthProvider>().currentUser?.fullName ?? ''}',
+                          style: const TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -889,45 +827,76 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          'Chuyên khoa Tim Mạch',
-                          style: TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.statusCompleted.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(
-                              AppDimens.radiusSm,
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.check_circle,
-                                size: 14,
-                                color: AppColors.statusCompleted,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Đã xác thực',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.statusCompleted,
-                                  fontWeight: FontWeight.w600,
+                        FutureBuilder<Map<String, dynamic>?>(
+                          future: _doctorInfoFuture,
+                          builder: (context, snap) {
+                            // Specialty: đọc từ local prefs (không cần mạng)
+                            final specialty =
+                                _cachedSpecialty?.isNotEmpty == true
+                                ? _cachedSpecialty
+                                : snap.data?['specialty'] as String?;
+                            final isVerified =
+                                snap.data?['isVerified'] as bool? ?? false;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  specialty != null && specialty.isNotEmpty
+                                      ? 'Chuyên khoa $specialty'
+                                      : 'Chưa có chuyên khoa',
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isVerified
+                                        ? AppColors.statusCompleted.withOpacity(
+                                            0.1,
+                                          )
+                                        : Colors.orange.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(
+                                      AppDimens.radiusSm,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isVerified
+                                            ? Icons.check_circle
+                                            : Icons.access_time_rounded,
+                                        size: 14,
+                                        color: isVerified
+                                            ? AppColors.statusCompleted
+                                            : Colors.orange,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isVerified
+                                            ? 'Đã xác thực'
+                                            : 'Chưa xác thực',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isVerified
+                                              ? AppColors.statusCompleted
+                                              : Colors.orange,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -944,22 +913,13 @@ class _HomeScreenState extends State<HomeScreen>
                 _buildProfileItem(
                   icon: Icons.person_outline,
                   title: 'Hồ sơ cá nhân',
-                  onTap: () {},
-                ),
-                _buildProfileItem(
-                  icon: Icons.notifications_none,
-                  title: 'Thông báo',
-                  onTap: () {},
-                ),
-                _buildProfileItem(
-                  icon: Icons.lock_outline,
-                  title: 'Đổi mật khẩu',
-                  showBorder: false,
-                  onTap: () {},
+                  onTap: () => context.push(
+                    '${AppRouter.doctorSupplementInfoPath}?allowBack=true',
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: AppDimens.lg),
+            const SizedBox(height: AppDimens.md),
 
             // Nhóm Hỗ trợ
             _buildProfileSection(
@@ -977,7 +937,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 _buildProfileItem(
                   icon: Icons.info_outline,
-                  title: 'Về ứng dụng',
+                  title: 'Map Bênh viện',
                   showBorder: false,
                   onTap: () {},
                 ),
@@ -1062,11 +1022,7 @@ class _HomeScreenState extends State<HomeScreen>
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(AppDimens.md),
-        decoration: BoxDecoration(
-          border: showBorder
-              ? Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.1)))
-              : null,
-        ),
+        decoration: BoxDecoration(),
         child: Row(
           children: [
             Container(
@@ -1098,7 +1054,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _showLogoutDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text(
           'Đăng xuất',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -1107,21 +1063,295 @@ class _HomeScreenState extends State<HomeScreen>
           'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng không?',
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.go(AppRouter.roleSelectionPath);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Đăng xuất'),
+          Row(
+            children: [
+              Expanded(
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap: () => Navigator.of(ctx).pop(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Hủy',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Material(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      context.go(AppRouter.roleSelectionPath);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Đăng xuất',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PatientListCardWidget extends StatelessWidget {
+  final Map<String, dynamic> consultationData;
+  final String searchQuery;
+
+  const _PatientListCardWidget({
+    required this.consultationData,
+    this.searchQuery = '',
+  });
+
+  Widget _buildStatusStepBadge(String status) {
+    String text = '';
+    Color color = Colors.grey;
+    switch (status) {
+      case 'waiting':
+        text = 'Đang chờ';
+        color = Colors.orange;
+        break;
+      case 'accepted':
+        text = 'Đang tư vấn';
+        color = Colors.blue;
+        break;
+      case 'completed':
+        text = 'Đã hoàn thành';
+        color = Colors.green;
+        break;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final patientId = consultationData['patientId'] ?? '';
+    final symptom = consultationData['specialty'] ?? 'Triệu chứng chưa rõ';
+    final status = consultationData['status'] ?? 'waiting';
+    final createdAt = consultationData['createdAt'] as Timestamp?;
+
+    // Import package intl để dùng nếu chưa có, tạm dùng string cơ bản
+    final timeStr = createdAt != null
+        ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:${createdAt.toDate().minute.toString().padLeft(2, '0')} ${createdAt.toDate().day}/${createdAt.toDate().month}'
+        : '--:--';
+
+    return FutureBuilder<DocumentSnapshot?>(
+      future: patientId.isNotEmpty
+          ? FirebaseFirestore.instance.collection('users').doc(patientId).get()
+          : Future.value(null),
+      builder: (context, snapshot) {
+        String name = 'Đang tải...';
+        String phone = '---';
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          name = userData?['full_name'] ?? 'Bệnh nhân';
+          phone = userData?['phone'] ?? 'Không có SĐT';
+        }
+
+        // Search logic
+        if (searchQuery.isNotEmpty &&
+            snapshot.connectionState == ConnectionState.done) {
+          if (!name.toLowerCase().contains(searchQuery.toLowerCase()) &&
+              !phone.contains(searchQuery)) {
+            return const SizedBox.shrink();
+          }
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.only(
+            left: 16,
+            right: 0,
+            top: 16,
+            bottom: 16,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.primary.withOpacity(0.1),
+                child: Text(
+                  name.isNotEmpty
+                      ? name
+                            .substring(0, name.length >= 2 ? 2 : 1)
+                            .toUpperCase()
+                      : 'BN',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        _buildStatusStepBadge(status),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      symptom,
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.phone_outlined,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          phone,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Icon(
+                          Icons.schedule_outlined,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          timeStr,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chat),
+                onPressed: () => context.push(AppRouter.chatPath),
+                iconSize: 16,
+              ),
+              // if (status == 'waiting')
+              //   IconButton(
+              //     icon: const Icon(
+              //       Icons.check_circle_outline,
+              //       color: Colors.green,
+              //     ),
+              //     tooltip: 'Nhận tư vấn',
+              //     onPressed: () {
+              //       final docId = consultationData['docId'];
+              //       if (docId != null) {
+              //         final currentUserId = context
+              //             .read<AuthProvider>()
+              //             .currentUser
+              //             ?.id;
+              //         FirebaseFirestore.instance
+              //             .collection('consultations')
+              //             .doc(docId)
+              //             .update({
+              //               'status': 'accepted',
+              //               'doctorId': currentUserId,
+              //             });
+              //       }
+              //     },
+              //   )
+              // else
+              //   IconButton(
+              //     icon: const Icon(
+              //       Icons.chat_bubble_outline,
+              //       color: AppColors.primary,
+              //     ),
+              //     onPressed: () => context.push(AppRouter.chatPath),
+              //   ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

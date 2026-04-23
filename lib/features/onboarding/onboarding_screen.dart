@@ -7,7 +7,6 @@ import 'package:care_talk/core/router/app_router.dart';
 import 'package:care_talk/core/services/storage_service.dart';
 import 'package:care_talk/core/widgets/app_button.dart';
 
-/// Màn hình Onboarding được thiết kế lại theo mẫu Clinic AI
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
 

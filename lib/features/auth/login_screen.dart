@@ -43,10 +43,16 @@ class _LoginScreenState extends State<LoginScreen> {
     if (mounted) {
       if (success) {
         final user = authProvider.currentUser;
-        if (user?.role == 'doctor' && !user!.isProfileComplete) {
-          context.go(AppRouter.doctorSupplementInfoPath);
-        } else if (widget.role == 'patient') {
+        final userRole = user?.role ?? widget.role;
+
+        if (userRole == 'patient') {
           context.go(AppRouter.patientHomePath);
+        } else if (userRole == 'doctor' || userRole == 'staff') {
+          if (user?.isProfileComplete == true) {
+            context.go(AppRouter.homePath);
+          } else {
+            context.go(AppRouter.doctorSupplementInfoPath);
+          }
         } else {
           context.go(AppRouter.homePath);
         }
