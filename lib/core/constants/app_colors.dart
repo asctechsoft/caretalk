@@ -9,6 +9,7 @@ class AppColors {
   static const Color primaryLight = Color(0xFF4A9BD9);
   static const Color primaryDark = Color(0xFF1A4971);
   static const Color primarySurface = Color(0xFFE8F4FD);
+  static const Color primaryWhite = Color(0xFFF9F9FE);
 
   // ─── Secondary / Accent ────────────────────────────────────────────
   static const Color accent = Color(0xFF38B2AC);
@@ -52,7 +53,13 @@ class AppColors {
 
   // ─── Gradient ──────────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF2B6CB0), Color(0xFF38B2AC)],
+    colors: [Color(0xFF005BBC), Color(0xFF00A1FB)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient primaryGradient1 = LinearGradient(
+    colors: [Color.fromARGB(199, 174, 196, 161), Color(0xFF00A1FB)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

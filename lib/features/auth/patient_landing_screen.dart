@@ -33,7 +33,7 @@ class PatientLandingScreen extends StatelessWidget {
       ),
       body: Container(
         width: double.infinity,
-        decoration: BoxDecoration(gradient: AppColors.onboardingGradient),
+        decoration: BoxDecoration(color: AppColors.primaryWhite),
         child: SafeArea(
           child: Column(
             children: [

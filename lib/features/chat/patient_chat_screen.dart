@@ -61,7 +61,9 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             );
             // Sync về local để dùng offline
             await StorageService().saveChatHistory(history);
-            debugPrint('✅ Load từ Firestore chat_sessions: ${history.length} sessions');
+            debugPrint(
+              '✅ Load từ Firestore chat_sessions: ${history.length} sessions',
+            );
           }
         } else {
           history = await StorageService().getChatHistory();
@@ -112,11 +114,13 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
             .collection('chat_sessions')
             .doc(firebaseUser.uid)
             .set({
-          'user_id': firebaseUser.uid,
-          'sessions': _historySessions,
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-        debugPrint('✅ Lưu Firestore chat_sessions thành công: ${_historySessions.length} sessions');
+              'user_id': firebaseUser.uid,
+              'sessions': _historySessions,
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+        debugPrint(
+          '✅ Lưu Firestore chat_sessions thành công: ${_historySessions.length} sessions',
+        );
       } catch (e) {
         debugPrint('❌ Lỗi lưu Firestore (chi tiết): $e');
       }
@@ -184,7 +188,10 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
 
     try {
       debugPrint('--- GỌI API CHATBOT ---');
-      final stream = ApiService().sendChatMessageStream(text);
+      final isAnonymous = FirebaseAuth.instance.currentUser == null;
+      final stream = isAnonymous
+          ? ApiService().sendAnonymousChatMessageStream(text)
+          : ApiService().sendChatMessageStream(text);
 
       // Chuẩn bị một tin nhắn trống cho bot để hiển thị typing effect
       setState(() {
@@ -725,15 +732,15 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(
-              Icons.image_outlined,
-              color: AppColors.primary,
-              size: 28,
-            ),
-            onPressed: _pickImage,
-          ),
-          const SizedBox(width: 8),
+          // IconButton(
+          //   icon: const Icon(
+          //     Icons.image_outlined,
+          //     color: AppColors.primary,
+          //     size: 28,
+          //   ),
+          //   onPressed: _pickImage,
+          // ),
+          // const SizedBox(width: 8),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),

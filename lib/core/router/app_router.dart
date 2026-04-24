@@ -18,6 +18,7 @@ import 'package:care_talk/features/chat/patient_doctor_chat_screen.dart';
 import 'package:care_talk/features/doctor_supplement_info/doctor_supplement_info_screen.dart';
 import 'package:care_talk/features/settings/settings_screen.dart';
 import 'package:care_talk/features/home/patient_consultation_history_screen.dart';
+import 'package:care_talk/features/home/consultation_detail_screen.dart';
 
 /// Quản lý routing cho toàn bộ ứng dụng
 class AppRouter {
@@ -42,6 +43,7 @@ class AppRouter {
   static const String doctorSupplementInfo = 'doctor-supplement-info';
   static const String settings = 'settings';
   static const String patientConsultationHistory = 'patient-consultation-history';
+  static const String consultationDetail = 'consultation-detail';
 
   // ─── Route Paths ───────────────────────────────────────────────────
   static const String splashPath = '/';
@@ -62,6 +64,7 @@ class AppRouter {
   static const String doctorSupplementInfoPath = '/doctor-supplement-info';
   static const String settingsPath = '/settings';
   static const String patientConsultationHistoryPath = '/patient-consultation-history';
+  static const String consultationDetailPath = '/consultation-detail';
 
   // ─── Navigator Key ─────────────────────────────────────────────────
   static final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -130,7 +133,8 @@ class AppRouter {
       name: chat,
       builder: (context, state) {
         final sessionId = state.uri.queryParameters['sessionId'];
-        return ChatScreen(sessionId: sessionId);
+        final consultationId = state.uri.queryParameters['consultationId'];
+        return ChatScreen(sessionId: sessionId, consultationId: consultationId);
       },
     ),
     GoRoute(
@@ -206,6 +210,14 @@ class AppRouter {
       path: patientConsultationHistoryPath,
       name: patientConsultationHistory,
       builder: (context, state) => const PatientConsultationHistoryScreen(),
+    ),
+    GoRoute(
+      path: consultationDetailPath,
+      name: consultationDetail,
+      builder: (context, state) {
+        final id = state.uri.queryParameters['id'] ?? '';
+        return ConsultationDetailScreen(consultationId: id);
+      },
     ),
   ];
 }

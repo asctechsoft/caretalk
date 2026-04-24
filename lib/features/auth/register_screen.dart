@@ -99,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(gradient: AppColors.onboardingGradient),
+        decoration: BoxDecoration(color: AppColors.primaryWhite),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppDimens.xl),

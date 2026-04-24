@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:care_talk/core/constants/app_colors.dart';
 import 'package:care_talk/core/constants/app_dimens.dart';
 import 'package:care_talk/core/constants/app_strings.dart';
 
-/// Màn hình Chat - Trò chuyện với ChatBot
+/// Màn hình Chat - Trò chuyện giữa bác sĩ và bệnh nhân
 class ChatScreen extends StatefulWidget {
   final String? sessionId;
+  final String? consultationId;
 
-  const ChatScreen({super.key, this.sessionId});
+  const ChatScreen({super.key, this.sessionId, this.consultationId});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -19,10 +21,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<_ChatMessage> _messages = [];
   bool _isTyping = false;
 
+  // Patient info loaded from Firestore
+  String _patientName = 'Bệnh nhân';
+  String _patientInitial = 'BN';
+  bool _loadingPatient = true;
+
   @override
   void initState() {
     super.initState();
-    // Tin nhắn chào mừng
     _messages.add(
       _ChatMessage(
         message: AppStrings.chatWelcome,
@@ -30,6 +36,54 @@ class _ChatScreenState extends State<ChatScreen> {
         timestamp: DateTime.now(),
       ),
     );
+    _loadPatientInfo();
+  }
+
+  Future<void> _loadPatientInfo() async {
+    final consultationId = widget.consultationId ?? widget.sessionId;
+    if (consultationId == null || consultationId.isEmpty) {
+      setState(() => _loadingPatient = false);
+      return;
+    }
+
+    try {
+      final consultDoc = await FirebaseFirestore.instance
+          .collection('consultations')
+          .doc(consultationId)
+          .get();
+
+      if (!consultDoc.exists) {
+        setState(() => _loadingPatient = false);
+        return;
+      }
+
+      final patientId = (consultDoc.data()?['patientId'] as String?) ?? '';
+      if (patientId.isEmpty) {
+        setState(() => _loadingPatient = false);
+        return;
+      }
+
+      final patientDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(patientId)
+          .get();
+
+      if (patientDoc.exists && mounted) {
+        final name =
+            (patientDoc.data()?['full_name'] as String?) ?? 'Bệnh nhân';
+        setState(() {
+          _patientName = name;
+          _patientInitial = name.isNotEmpty
+              ? name[name.length - 1].toUpperCase()
+              : 'BN';
+          _loadingPatient = false;
+        });
+      } else {
+        setState(() => _loadingPatient = false);
+      }
+    } catch (_) {
+      setState(() => _loadingPatient = false);
+    }
   }
 
   @override
@@ -44,29 +98,28 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
 
     setState(() {
-      _messages.add(_ChatMessage(
-        message: text,
-        isUser: true,
-        timestamp: DateTime.now(),
-      ));
+      _messages.add(
+        _ChatMessage(message: text, isUser: true, timestamp: DateTime.now()),
+      );
       _messageController.clear();
       _isTyping = true;
     });
 
     _scrollToBottom();
 
-    // TODO: Gọi API chatbot / Firebase
-    // Simulate bot response
+    // TODO: Gửi tin nhắn thực qua Firestore realtime
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         setState(() {
           _isTyping = false;
-          _messages.add(_ChatMessage(
-            message:
-                'Cảm ơn bạn đã liên hệ. Tôi đang xử lý yêu cầu của bạn...',
-            isUser: false,
-            timestamp: DateTime.now(),
-          ));
+          _messages.add(
+            _ChatMessage(
+              message:
+                  'Cảm ơn bạn đã liên hệ. Tôi đang xử lý yêu cầu của bạn...',
+              isUser: false,
+              timestamp: DateTime.now(),
+            ),
+          );
         });
         _scrollToBottom();
       }
@@ -93,32 +146,73 @@ class _ChatScreenState extends State<ChatScreen> {
         titleSpacing: 0,
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          color: AppColors.textPrimary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: Row(
           children: [
-            const CircleAvatar(
+            // Avatar
+            CircleAvatar(
               radius: 18,
-              backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=Patient&background=random'),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Bệnh nhân Nguyễn Hải',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+              backgroundColor: AppColors.primarySurface,
+              child: _loadingPatient
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      _patientInitial,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
-                    const SizedBox(width: 4),
-                    const Text('Đang trực tuyến', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ),
-              ],
+            ),
+            const SizedBox(width: 10),
+            // Name + status — wrapped in Expanded to prevent overflow
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _loadingPatient ? 'Đang tải...' : _patientName,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF43A047),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Đang trực tuyến',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          color: Color(0xFF9090AA),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -155,16 +249,27 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(_ChatMessage message) {
-    final isUser = message.isUser; // User ở đây là Bác sĩ (người dùng hiện tại)
+    final isUser = message.isUser;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isUser) ...[
-            const CircleAvatar(
+            CircleAvatar(
               radius: 16,
-              backgroundImage: NetworkImage('https://ui-avatars.com/api/?name=H&background=random'),
+              backgroundColor: AppColors.primarySurface,
+              child: Text(
+                _patientInitial,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -181,20 +286,23 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Column(
-                crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: isUser
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
                   Text(
                     message.message,
                     style: TextStyle(
                       color: isUser ? Colors.white : Colors.black87,
                       fontSize: 14,
+                      fontFamily: 'Inter',
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -219,15 +327,17 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              shape: BoxShape.circle,
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: AppColors.primarySurface,
+            child: Text(
+              _patientInitial,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            child: const Icon(Icons.smart_toy_rounded,
-                color: AppColors.white, size: 14),
           ),
           const SizedBox(width: 8),
           Container(
@@ -261,11 +371,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary, size: 28),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -275,25 +380,45 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: TextField(
                 controller: _messageController,
+                onTap: () {
+                  Future.delayed(
+                    const Duration(milliseconds: 300),
+                    _scrollToBottom,
+                  );
+                },
+                maxLines: null,
+                minLines: 1,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
                 decoration: const InputDecoration(
-                  hintText: 'Soạn tin nhắn...',
+                  hintText: 'Nhập tin nhắn ..',
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 15),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  filled: false,
                 ),
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
               ),
             ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: _sendMessage,
+            // onTap: _sendMessage,
+            onTap: () {},
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: const BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.send_rounded, color: Colors.white, size: 24),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
         ],
@@ -324,9 +449,10 @@ class _TypingDotState extends State<_TypingDot>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _animation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     Future.delayed(Duration(milliseconds: widget.delay), () {
       if (mounted) _controller.repeat(reverse: true);
@@ -350,8 +476,9 @@ class _TypingDotState extends State<_TypingDot>
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: AppColors.textHint
-                  .withValues(alpha: 0.5 + 0.5 * _animation.value),
+              color: AppColors.textHint.withValues(
+                alpha: 0.5 + 0.5 * _animation.value,
+              ),
               shape: BoxShape.circle,
             ),
           ),

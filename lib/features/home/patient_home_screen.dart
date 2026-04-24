@@ -92,11 +92,11 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             children: [
               IconButton(
                 icon: const Icon(
-                  Icons.notifications_none_rounded,
+                  Icons.notifications_active_rounded,
                   color: AppColors.primary,
                   size: 28,
                 ),
-                onPressed: () => _showNotifications(context),
+                onPressed: () => {},
               ),
               Positioned(
                 right: 12,
@@ -183,7 +183,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             Container(
               padding: const EdgeInsets.all(AppDimens.lg),
               decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
+                gradient: AppColors.primaryGradient1,
                 borderRadius: BorderRadius.circular(AppDimens.radiusLg),
                 boxShadow: [
                   BoxShadow(
@@ -273,45 +273,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                 ],
               ),
             ),
+
             // Grid of other features
-            // const Text(
-            //   'Tiện ích khác',
-            //   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            // ),
-            // const SizedBox(height: 16),
-            // GridView.count(
-            //   crossAxisCount: 2,
-            //   shrinkWrap: true,
-            //   physics: const NeverScrollableScrollPhysics(),
-            //   mainAxisSpacing: 16,
-            //   crossAxisSpacing: 16,
-            //   children: [
-            //     _FeatureCard(
-            //       icon: Icons.calendar_month_outlined,
-            //       title: 'Đặt lịch khám',
-            //       color: Colors.orange,
-            //       onTap: () {},
-            //     ),
-            //     _FeatureCard(
-            //       icon: Icons.history_rounded,
-            //       title: 'Lịch sử khám',
-            //       color: Colors.blue,
-            //       onTap: () {},
-            //     ),
-            //     _FeatureCard(
-            //       icon: Icons.medication_outlined,
-            //       title: 'Đơn thuốc',
-            //       color: Colors.green,
-            //       onTap: () {},
-            //     ),
-            //     _FeatureCard(
-            //       icon: Icons.info_outline_rounded,
-            //       title: 'Kiến thức y khoa',
-            //       color: Colors.purple,
-            //       onTap: () {},
-            //     ),
-            //   ],
-            // ),
           ],
         ),
       ),
@@ -470,46 +433,45 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
           SizedBox(height: 8),
 
-          Center(
-            child: InkWell(
-              onTap: () {
-                context.pop();
-                context.push(AppRouter.patientConsultationHistoryPath);
-              },
-              child: Ink(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.request_quote_rounded,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 16),
-                    const Text(
-                      'Yêu cầu với bác sĩ',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
-            child: Divider(),
-          ),
-          const SizedBox(height: 8),
-
+          // Center(
+          //   child: InkWell(
+          //     onTap: () {
+          //       context.pop();
+          //       context.push(AppRouter.patientConsultationHistoryPath);
+          //     },
+          //     child: Ink(
+          //       padding: const EdgeInsets.symmetric(
+          //         horizontal: 16,
+          //         vertical: 8,
+          //       ),
+          //       decoration: BoxDecoration(
+          //         borderRadius: BorderRadius.circular(8),
+          //       ),
+          //       child: Row(
+          //         children: [
+          //           const Icon(
+          //             Icons.request_quote_rounded,
+          //             color: AppColors.primary,
+          //           ),
+          //           const SizedBox(width: 16),
+          //           const Text(
+          //             'Yêu cầu với bác sĩ',
+          //             style: TextStyle(
+          //               color: AppColors.textPrimary,
+          //               fontSize: 16,
+          //               fontWeight: FontWeight.w500,
+          //             ),
+          //           ),
+          //         ],
+          //       ),
+          //     ),
+          //   ),
+          // ),
+          // Padding(
+          //   padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
+          //   child: Divider(),
+          // ),
+          // const SizedBox(height: 8),
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

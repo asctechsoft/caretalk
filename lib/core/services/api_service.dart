@@ -122,6 +122,62 @@ class ApiService {
     }
   }
 
+  /// Gửi tin nhắn cho Chatbot ẩn danh (dạng Stream)
+  Stream<String> sendAnonymousChatMessageStream(String message) async* {
+    try {
+      final response = await _dio.post<ResponseBody>(
+        '/api/v1/public/chat',
+        data: {'message': message},
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {
+            'X-API-Key': 'caretalk-dev-key-2026',
+          },
+        ),
+      );
+
+      if (response.data != null) {
+        final stream = response.data!.stream
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter());
+
+        await for (final line in stream) {
+          if (line.startsWith('data:')) {
+            String text = line.substring(5);
+            // CHÚ Ý: Không xóa dấu cách đầu tiên vì có vẻ backend dùng luôn dấu cách của chuẩn SSE làm dấu cách giữa các chữ!
+
+            if (text.isEmpty) {
+              yield '\n'; // Nếu dòng data trống, có thể backend muốn gửi xuống dòng
+              continue;
+            }
+
+            if (text == '[DONE]' || text == '[DONE]\n') break;
+
+            // Bỏ qua các object JSON rác (như sessionId hay messageId)
+            if (text.startsWith('{') && text.endsWith('}')) {
+              continue;
+            }
+
+            // Yield text từ bot
+            yield text;
+          }
+        }
+      }
+    } catch (e) {
+      _logger.e('Send Anonymous Chat Stream Error: $e');
+
+      // Fallback khi API lỗi để bạn vẫn test được UI
+      final mockResponse =
+          'Đây là phản hồi ẩn danh tự động (Do API đang báo lỗi). Hệ thống ghi nhận bạn có dấu hiệu cần theo dõi thêm. Vui lòng đăng nhập để trao đổi chi tiết hơn.';
+      final words = mockResponse.split(' ');
+      for (var word in words) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        yield '$word ';
+      }
+    }
+  }
+
   Future<bool> registerFirebase({
     required String firebaseUid,
     required String email,

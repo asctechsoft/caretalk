@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen>
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(gradient: AppColors.onboardingGradient),
+        decoration: BoxDecoration(color: AppColors.primaryWhite),
         child: AnimatedBuilder(
           animation: _animController,
           builder: (context, child) {
@@ -106,7 +106,7 @@ class _SplashScreenState extends State<SplashScreen>
                         fontFamily: 'Inter',
                         fontSize: 36,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.white,
+                        color: AppColors.primary,
                         letterSpacing: 1.5,
                       ),
                     ),

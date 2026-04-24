@@ -1,3 +1,4 @@
+import 'package:care_talk/core/constants/app_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -78,51 +79,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          _buildDashboard(),
-          // _buildChatTab(),
-          _buildPatientTab(),
-          _buildProfileTab(),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Tổng quan',
-            ),
-            // BottomNavigationBarItem(
-            //   icon: Icon(Icons.chat_rounded),
-            //   label: 'Chat',
-            // ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_rounded),
-              label: 'Bệnh nhân',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_rounded),
-              label: 'Cá nhân',
-            ),
-          ],
-        ),
-      ),
-    );
+    return _buildPatientTab();
   }
 
   // ─── Dashboard Tab ─────────────────────────────────────────────────
@@ -627,52 +584,141 @@ class _HomeScreenState extends State<HomeScreen>
         }).length;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFFBFBFE),
+          backgroundColor: const Color(0xFFF4F6FB),
           appBar: AppBar(
-            title: const Text('Danh sách bệnh nhân'),
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.person_add_rounded,
-                  color: AppColors.primary,
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                Image.asset(AppAssets.logo, width: 40, height: 40),
+                const SizedBox(width: 8),
+                const Text(
+                  'Danh sách bệnh nhân',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    color: Color(0xFF1A1A2E),
+                  ),
                 ),
-                onPressed: () => context.push(AppRouter.patientInfoPath),
-              ),
-            ],
-            bottom: TabBar(
-              controller: _tabController,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: AppColors.primary,
-              tabs: [
-                Tab(text: 'Đang chờ ($waitingCount)'),
-                Tab(text: 'Đang tư vấn ($inProgressCount)'),
-                Tab(text: 'Hoàn thành ($completedCount)'),
               ],
             ),
+            centerTitle: false,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            actions: [
+              // Icon thông báo
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Color(0xFF3A3A5C),
+                  size: 24,
+                ),
+                onPressed: () {},
+              ),
+
+              // Icon account + dropdown
+              Builder(
+                builder: (btnContext) {
+                  final doctorName =
+                      context.watch<AuthProvider>().currentUser?.fullName ??
+                      'Bác sĩ';
+                  final specialty = _cachedSpecialty ?? '';
+                  return GestureDetector(
+                    onTap: () => _showDoctorPopupMenu(
+                      btnContext,
+                      doctorName: 'Bác sĩ $doctorName',
+                      specialty: specialty,
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 12, left: 4),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySurface,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           body: Column(
             children: [
-              // Padding(
-              //   padding: const EdgeInsets.all(16.0),
-              //   child: Container(
-              //     padding: const EdgeInsets.symmetric(horizontal: 16),
-              //     decoration: BoxDecoration(
-              //       color: Colors.white,
-              //       borderRadius: BorderRadius.circular(12),
-              //       border: Border.all(color: Colors.grey.shade200),
+              // ── Stats summary bar ─────────────────────────────────
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: [
+                    _buildStatusStatCard(
+                      index: 0,
+                      label: 'Đang chờ',
+                      count: waitingCount,
+                      color: const Color(0xFFFF8F00),
+                      bgColor: const Color(0xFFFFF8E1),
+                      icon: Icons.hourglass_top_rounded,
+                    ),
+                    const SizedBox(width: 10),
+                    _buildStatusStatCard(
+                      index: 1,
+                      label: 'Đang tư vấn',
+                      count: inProgressCount,
+                      color: AppColors.primary,
+                      bgColor: AppColors.primarySurface,
+                      icon: Icons.chat_bubble_outline_rounded,
+                    ),
+                    const SizedBox(width: 10),
+                    _buildStatusStatCard(
+                      index: 2,
+                      label: 'Hoàn thành',
+                      count: completedCount,
+                      color: const Color(0xFF43A047),
+                      bgColor: const Color(0xFFE8F5E9),
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Tab indicator strip ───────────────────────────────
+              // Container(
+              //   color: Colors.white,
+              //   child: TabBar(
+              //     controller: _tabController,
+              //     labelColor: AppColors.primary,
+              //     unselectedLabelColor: const Color(0xFF9090AA),
+              //     indicatorColor: AppColors.primary,
+              //     indicatorWeight: 2.5,
+              //     labelStyle: const TextStyle(
+              //       fontFamily: 'Inter',
+              //       fontSize: 13,
+              //       fontWeight: FontWeight.w600,
               //     ),
-              //     child: TextField(
-              //       controller: _searchController,
-              //       onChanged: (value) => setState(() => _searchQuery = value),
-              //       decoration: const InputDecoration(
-              //         hintText: 'Tìm kiếm bệnh nhân...',
-              //         border: InputBorder.none,
-              //         icon: Icon(Icons.search, size: 20),
-              //       ),
+              //     unselectedLabelStyle: const TextStyle(
+              //       fontFamily: 'Inter',
+              //       fontSize: 13,
+              //       fontWeight: FontWeight.w400,
               //     ),
+              //     tabs: [
+              //       Tab(text: 'Chờ ($waitingCount)'),
+              //       Tab(text: 'Tư vấn ($inProgressCount)'),
+              //       Tab(text: 'Xong ($completedCount)'),
+              //     ],
               //   ),
               // ),
+
+              // ── List ─────────────────────────────────────────────
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -685,13 +731,83 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => context.push(AppRouter.patientInfoPath),
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.add_rounded, color: Colors.white),
-          ),
         );
       },
+    );
+  }
+
+  Widget _buildStatusStatCard({
+    required int index,
+    required String label,
+    required int count,
+    required Color color,
+    required Color bgColor,
+    required IconData icon,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _tabController.animateTo(index),
+        child: AnimatedBuilder(
+          animation: _tabController,
+          builder: (context, _) {
+            final isSelected = _tabController.index == index;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? color.withValues(alpha: 0.12) : bgColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? color.withValues(alpha: 0.5)
+                      : color.withValues(alpha: 0.15),
+                  width: isSelected ? 1.5 : 1,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: color, size: 22),
+                  const SizedBox(height: 6),
+                  Text(
+                    count.toString(),
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: color.withValues(alpha: 0.8),
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -740,40 +856,6 @@ class _HomeScreenState extends State<HomeScreen>
           searchQuery: _searchQuery,
         );
       },
-    );
-  }
-
-  Widget _buildStatusStepBadge(String status) {
-    String text = '';
-    Color color = Colors.grey;
-    switch (status) {
-      case 'waiting':
-        text = 'Đang chờ';
-        color = Colors.orange;
-        break;
-      case 'in_progress':
-        text = 'Đang tư vấn';
-        color = Colors.blue;
-        break;
-      case 'completed':
-        text = 'Đã hoàn thành';
-        color = Colors.green;
-        break;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
     );
   }
 
@@ -1051,6 +1133,166 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  void _showDoctorPopupMenu(
+    BuildContext btnContext, {
+    required String doctorName,
+    required String specialty,
+  }) {
+    final RenderBox renderBox = btnContext.findRenderObject() as RenderBox;
+    final Offset offset = renderBox.localToGlobal(Offset.zero);
+    final Size size = renderBox.size;
+
+    showMenu(
+      context: btnContext,
+      color: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      position: RelativeRect.fromLTRB(
+        offset.dx - 180,
+        offset.dy + size.height + 4,
+        offset.dx + size.width,
+        0,
+      ),
+      items: [
+        PopupMenuItem(
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: _buildDoctorMenuHeader(doctorName, specialty),
+        ),
+        // PopupMenuItem(
+        //   enabled: false,
+        //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        //   child: const Divider(height: 1, color: Color(0xFFF0F0F8)),
+        // ),
+        PopupMenuItem(
+          padding: EdgeInsets.zero,
+          onTap: () {
+            Future.delayed(const Duration(milliseconds: 150), () {
+              if (mounted) {
+                context.push(
+                  '${AppRouter.doctorSupplementInfoPath}?allowBack=true',
+                );
+              }
+            });
+          },
+          child: _buildMenuAction(
+            icon: Icons.person_outline_rounded,
+            label: 'Hồ sơ cá nhân',
+            color: AppColors.primary,
+          ),
+        ),
+        PopupMenuItem(
+          padding: EdgeInsets.zero,
+          onTap: () {
+            Future.delayed(const Duration(milliseconds: 150), () {
+              if (mounted) _showLogoutDialog();
+            });
+          },
+          child: _buildMenuAction(
+            icon: Icons.logout_rounded,
+            label: 'Đăng xuất',
+            color: AppColors.error,
+            isLast: true,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDoctorMenuHeader(String name, String specialty) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primarySurface,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                width: 1.5,
+              ),
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              color: AppColors.primary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (specialty.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    specialty,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: AppColors.textHint,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    bool isLast = false,
+  }) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: Color(0xFFF5F5FA), width: 1),
+              ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -1141,40 +1383,6 @@ class _PatientListCardWidget extends StatelessWidget {
     this.searchQuery = '',
   });
 
-  Widget _buildStatusStepBadge(String status) {
-    String text = '';
-    Color color = Colors.grey;
-    switch (status) {
-      case 'waiting':
-        text = 'Đang chờ';
-        color = Colors.orange;
-        break;
-      case 'accepted':
-        text = 'Đang tư vấn';
-        color = Colors.blue;
-        break;
-      case 'completed':
-        text = 'Đã hoàn thành';
-        color = Colors.green;
-        break;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final patientId = consultationData['patientId'] ?? '';
@@ -1182,9 +1390,8 @@ class _PatientListCardWidget extends StatelessWidget {
     final status = consultationData['status'] ?? 'waiting';
     final createdAt = consultationData['createdAt'] as Timestamp?;
 
-    // Import package intl để dùng nếu chưa có, tạm dùng string cơ bản
     final timeStr = createdAt != null
-        ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:${createdAt.toDate().minute.toString().padLeft(2, '0')} ${createdAt.toDate().day}/${createdAt.toDate().month}'
+        ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}h${createdAt.toDate().minute.toString().padLeft(2, '0')} hôm nay'
         : '--:--';
 
     return FutureBuilder<DocumentSnapshot?>(
@@ -1194,11 +1401,22 @@ class _PatientListCardWidget extends StatelessWidget {
       builder: (context, snapshot) {
         String name = 'Đang tải...';
         String phone = '---';
+        String dobYear = '';
+        String patientCode = '';
+
         if (snapshot.connectionState == ConnectionState.done &&
             snapshot.hasData) {
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           name = userData?['full_name'] ?? 'Bệnh nhân';
           phone = userData?['phone'] ?? 'Không có SĐT';
+          final rawDob = userData?['dob'] ?? userData?['birthday'] ?? '';
+          if (rawDob is String && rawDob.length >= 4) {
+            dobYear = rawDob.substring(0, 4);
+          }
+          final rawCode = userData?['patientCode'] ?? '';
+          patientCode = rawCode.isNotEmpty
+              ? rawCode
+              : 'P${patientId.substring(0, patientId.length >= 4 ? 4 : patientId.length).toUpperCase()}';
         }
 
         // Search logic
@@ -1210,148 +1428,320 @@ class _PatientListCardWidget extends StatelessWidget {
           }
         }
 
+        // --- Severity badge ---
+        final severity = (consultationData['severity'] ?? '')
+            .toString()
+            .toLowerCase();
+        Widget? severityBadge;
+        if (severity.contains('nặng') || severity == 'nang') {
+          severityBadge = const _SeverityBadge(
+            label: 'NẶNG',
+            color: Color(0xFFE53935),
+          );
+        } else if (severity.contains('trung')) {
+          severityBadge = const _SeverityBadge(
+            label: 'TB',
+            color: Color(0xFFFB8C00),
+          );
+        } else if (severity.contains('nhẹ') || severity == 'nhe') {
+          severityBadge = const _SeverityBadge(
+            label: 'NHẸ',
+            color: Color(0xFF43A047),
+          );
+        }
+
+        // --- Footer status ---
+        String footerLabel = 'Chờ tư vấn';
+        Color footerDotColor = const Color(0xFFFFB347);
+        if (status == 'accepted') {
+          footerLabel = 'Đang tư vấn';
+          footerDotColor = AppColors.primary;
+        } else if (status == 'completed') {
+          footerLabel = 'Đã hoàn thành';
+          footerDotColor = const Color(0xFF43A047);
+        }
+
+        final subText = dobYear.isNotEmpty
+            ? 'Năm sinh: $dobYear  •  ID: #$patientCode'
+            : 'SĐT: $phone';
+
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.only(
-            left: 16,
-            right: 0,
-            top: 16,
-            bottom: 16,
-          ),
+          margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade100),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFEEEEF5), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
-                child: Text(
-                  name.isNotEmpty
-                      ? name
-                            .substring(0, name.length >= 2 ? 2 : 1)
-                            .toUpperCase()
-                      : 'BN',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
+              // ── Top info ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Row 1: Tên + severity badge
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: Text(
-                            name,
+                            snapshot.connectionState == ConnectionState.waiting
+                                ? 'Đang tải...'
+                                : name,
                             style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontFamily: 'Inter',
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1A1A2E),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        _buildStatusStepBadge(status),
+                        if (severityBadge != null) ...[
+                          const SizedBox(width: 8),
+                          severityBadge,
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      symptom,
-                      style: const TextStyle(color: Colors.grey, fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 5),
+                    // Row 2: năm sinh / SĐT  |  clock + time
                     Row(
                       children: [
-                        const Icon(
-                          Icons.phone_outlined,
-                          size: 14,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          phone,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                        Expanded(
+                          child: Text(
+                            subText,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 12.5,
+                              color: Color(0xFF9090AA),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 8),
                         const Icon(
-                          Icons.schedule_outlined,
-                          size: 14,
-                          color: Colors.grey,
+                          Icons.access_time_rounded,
+                          size: 13,
+                          color: Color(0xFF9090AA),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Text(
                           timeStr,
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                            fontFamily: 'Inter',
+                            fontSize: 12.5,
+                            color: Color(0xFF9090AA),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Row 3: Symptom box
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF6F7FB),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 1.5),
+                            child: Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: Color(0xFFE0A800),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  const TextSpan(
+                                    text: 'Triệu chứng: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF3A3A5C),
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: symptom,
+                                    style: const TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
+                                      color: Color(0xFF3A3A5C),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.chat),
-                onPressed: () => context.push(AppRouter.chatPath),
-                iconSize: 16,
+
+              // ── Divider ───────────────────────────────────────────
+              const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F8)),
+
+              // ── Footer ────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+                child: Row(
+                  children: [
+                    // Status dot + label
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: footerDotColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      footerLabel,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: footerDotColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    // "Xem chi tiết" outlined
+                    OutlinedButton(
+                      onPressed: () {
+                        final docId = consultationData['docId'];
+                        if (docId != null && docId.toString().isNotEmpty) {
+                          context.pushNamed(
+                            AppRouter.consultationDetail,
+                            queryParameters: {'id': docId.toString()},
+                          );
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        side: BorderSide(
+                          color: Colors.grey.shade300,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Xem chi tiết',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF3A3A5C),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // "Tư vấn" filled
+                    ElevatedButton(
+                      onPressed: () {
+                        final docId = consultationData['docId'];
+                        if (docId != null && docId.toString().isNotEmpty) {
+                          context.push(
+                            '${AppRouter.chatPath}?consultationId=$docId',
+                          );
+                        } else {
+                          context.push(AppRouter.chatPath);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 7,
+                        ),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Tư vấn',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              // if (status == 'waiting')
-              //   IconButton(
-              //     icon: const Icon(
-              //       Icons.check_circle_outline,
-              //       color: Colors.green,
-              //     ),
-              //     tooltip: 'Nhận tư vấn',
-              //     onPressed: () {
-              //       final docId = consultationData['docId'];
-              //       if (docId != null) {
-              //         final currentUserId = context
-              //             .read<AuthProvider>()
-              //             .currentUser
-              //             ?.id;
-              //         FirebaseFirestore.instance
-              //             .collection('consultations')
-              //             .doc(docId)
-              //             .update({
-              //               'status': 'accepted',
-              //               'doctorId': currentUserId,
-              //             });
-              //       }
-              //     },
-              //   )
-              // else
-              //   IconButton(
-              //     icon: const Icon(
-              //       Icons.chat_bubble_outline,
-              //       color: AppColors.primary,
-              //     ),
-              //     onPressed: () => context.push(AppRouter.chatPath),
-              //   ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Badge mức độ bệnh (NẶNG / TB / NHẸ)
+class _SeverityBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _SeverityBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: color,
+          letterSpacing: 0.4,
+        ),
+      ),
     );
   }
 }

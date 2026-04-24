@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(gradient: AppColors.onboardingGradient),
+        decoration: BoxDecoration(color: AppColors.primaryWhite),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppDimens.xl),
