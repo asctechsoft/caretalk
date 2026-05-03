@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:care_talk/core/theme/app_theme.dart';
 import 'package:care_talk/core/router/app_router.dart';
@@ -10,8 +11,42 @@ import 'package:care_talk/providers/chat_provider.dart';
 import 'package:care_talk/providers/patient_provider.dart';
 
 /// Root widget của ứng dụng CareTalk
-class App extends StatelessWidget {
+class App extends StatefulWidget {
   const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _hideNavBar();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Ẩn navigation bar phía dưới, giữ status bar
+  void _hideNavBar() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top],
+    );
+  }
+
+  /// Reapply khi app resume từ background (hệ thống có thể reset lại)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _hideNavBar();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,10 +84,10 @@ class App extends StatelessWidget {
         builder: (context, child) {
           if (kIsWeb) {
             return Scaffold(
-              backgroundColor: const Color(0xFF0F172A), // Dark slate background
+              backgroundColor: const Color(0xFF0F172A),
               body: Center(
                 child: Container(
-                  width: 450, // Mobile width
+                  width: 450,
                   height: double.infinity,
                   margin: const EdgeInsets.symmetric(vertical: 20),
                   clipBehavior: Clip.antiAlias,

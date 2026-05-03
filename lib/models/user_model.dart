@@ -32,7 +32,10 @@ class UserModel extends Equatable {
       phone: json['phone'] ?? '',
       avatarUrl: json['avatar_url'],
       role: json['role'] ?? 'patient',
-      isProfileComplete: json['is_profile_complete'] ?? (json['role'] == 'patient'), // Patients are complete by default for now
+      isProfileComplete:
+          json['is_profile_complete'] ??
+          (json['role'] ==
+              'patient'), // Patients are complete by default for now
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -77,6 +80,15 @@ class UserModel extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, fullName, email, phone, avatarUrl, role, isProfileComplete, createdAt, updatedAt];
+  List<Object?> get props => [
+    id,
+    fullName,
+    email,
+    phone,
+    avatarUrl,
+    role,
+    isProfileComplete,
+    createdAt,
+    updatedAt,
+  ];
 }

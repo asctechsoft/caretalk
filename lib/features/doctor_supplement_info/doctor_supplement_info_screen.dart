@@ -47,10 +47,70 @@ class _DoctorSupplementInfoScreenState
   @override
   void initState() {
     super.initState();
-    // Load existing data if any
+    _loadDoctorProfile();
+  }
+
+  /// Load thông tin bác sĩ từ Firestore khi mở màn hình
+  Future<void> _loadDoctorProfile() async {
     final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
-    if (user != null) {
-      _nameController.text = user.fullName;
+    if (user == null) return;
+
+    // Điền sẵn tên từ AuthProvider trước
+    _nameController.text = user.fullName;
+
+    // Ưu tiên load từ collection 'doctors'
+    Map<String, dynamic>? doc = await FirebaseService().getDocument(
+      collection: 'doctors',
+      documentId: user.id,
+    );
+
+    // Fallback về 'users' nếu chưa có trong 'doctors'
+    doc ??= await FirebaseService().getDocument(
+      collection: 'users',
+      documentId: user.id,
+    );
+
+    if (doc != null && mounted) {
+      setState(() {
+        if (doc!['full_name'] != null &&
+            doc['full_name'].toString().isNotEmpty) {
+          _nameController.text = doc['full_name'];
+        }
+        if (doc['birth_year'] != null) {
+          _birthYearController.text = doc['birth_year'].toString();
+        }
+        if (doc['address'] != null) {
+          _addressController.text = doc['address'];
+        }
+        if (doc['workplace'] != null) {
+          _workplaceController.text = doc['workplace'];
+        }
+        if (doc['job_title'] != null) {
+          _jobTitleController.text = doc['job_title'];
+        }
+        if (doc['experience'] != null) {
+          _experienceController.text = doc['experience'].toString();
+        }
+        if (doc['gender'] != null) {
+          final g = doc['gender'].toString();
+          if (['Nam', 'Nữ', 'Khác'].contains(g)) _gender = g;
+        }
+        if (doc['specialty'] != null) {
+          final specialtyList = [
+            'Nội tổng quát',
+            'Ngoại khoa',
+            'Sản phụ khoa',
+            'Nhi khoa',
+            'Tai Mũi Họng',
+            'Mắt',
+            'Da liễu',
+            'Tâm thần',
+          ];
+          if (specialtyList.contains(doc['specialty'])) {
+            _specialty = doc['specialty'];
+          }
+        }
+      });
     }
   }
 
@@ -83,7 +143,6 @@ class _DoctorSupplementInfoScreenState
     final currentUser = authProvider.currentUser;
 
     final doctorData = {
-      'uid': currentUser?.id ?? '',
       'full_name': _nameController.text.trim(),
       'birth_year': _birthYearController.text.trim(),
       'gender': _gender,
@@ -98,10 +157,10 @@ class _DoctorSupplementInfoScreenState
       'isVerified': false,
     };
 
-    // Lưu vào bảng 'doctors' trên Firestore
-    await FirebaseService().createDocument(
+    // Lưu vào bảng 'doctors' (merge để không mất dữ liệu cũ)
+    await FirebaseService().updateDocument(
       collection: 'doctors',
-      documentId: currentUser?.id,
+      documentId: currentUser?.id ?? '',
       data: doctorData,
     );
 
@@ -109,19 +168,8 @@ class _DoctorSupplementInfoScreenState
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefConst.doctorSpecialty, _specialty);
 
-    // Cập nhật lại profile trong bảng 'users' (đánh dấu is_profile_complete)
-    final success = await authProvider.updateProfile({
-      'full_name': _nameController.text.trim(),
-      'birth_year': _birthYearController.text.trim(),
-      'gender': _gender,
-      'address': _addressController.text.trim(),
-      'specialty': _specialty,
-      'workplace': _workplaceController.text.trim(),
-      'job_title': _jobTitleController.text.trim(),
-      'experience': _experienceController.text.trim(),
-      'is_profile_complete': true,
-      'isVerified': false,
-    });
+    // Cập nhật lại profile trong bảng 'users'
+    final success = await authProvider.updateDoctorProfile(doctorData);
 
     setState(() => _isLoading = false);
 

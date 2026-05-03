@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:logger/logger.dart';
 import 'package:care_talk/core/services/storage_service.dart';
 
@@ -12,9 +13,13 @@ class ApiService {
   final Logger _logger = Logger();
 
   ApiService._internal() {
+    // Trên web: dùng đường dẫn tương đối → Firebase Hosting rewrite → Cloud Function proxy → backend
+    // Trên mobile: gọi thẳng backend HTTP (không bị Mixed Content)
+    final String baseUrl = kIsWeb ? '' : 'http://103.48.84.161:8888';
+
     _dio = Dio(
       BaseOptions(
-        baseUrl: 'http://103.48.84.161:8888',
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         headers: {'Content-Type': 'application/json'},
@@ -25,19 +30,26 @@ class ApiService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Luôn lấy Firebase ID Token mới nhất
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null) {
-            final idToken = await user.getIdToken();
-            if (idToken != null) {
-              options.headers['Authorization'] = 'Bearer $idToken';
-              _logger.i(
-                '🔑 Đã đính kèm Token của user: ${user.uid} (Token bắt đầu bằng: ${idToken.substring(0, 15)}...)',
+          // Bỏ qua gắn token với các request public (skipAuth = true)
+          final skipAuth = options.extra['skipAuth'] == true;
+          if (!skipAuth) {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              final idToken = await user.getIdToken();
+              if (idToken != null) {
+                options.headers['Authorization'] = 'Bearer $idToken';
+                _logger.i(
+                  '🔑 Đã đính kèm Token của user: ${user.uid} (Token bắt đầu bằng: ${idToken.substring(0, 15)}...)',
+                );
+              }
+            } else {
+              _logger.w(
+                '⚠️ KHÔNG có user đăng nhập, không có token nào được đính kèm!',
               );
             }
           } else {
-            _logger.w(
-              '⚠️ KHÔNG có user đăng nhập, không có token nào được đính kèm!',
+            _logger.i(
+              'ℹ️ skipAuth=true → Không gắn Bearer token (public request)',
             );
           }
 
@@ -130,9 +142,8 @@ class ApiService {
         data: {'message': message},
         options: Options(
           responseType: ResponseType.stream,
-          headers: {
-            'X-API-Key': 'caretalk-dev-key-2026',
-          },
+          headers: {'X-API-Key': 'caretalk-dev-key-2026'},
+          extra: {'skipAuth': true}, // Không gắn Bearer token → public endpoint
         ),
       );
 
@@ -142,40 +153,54 @@ class ApiService {
             .transform(utf8.decoder)
             .transform(const LineSplitter());
 
+        bool errorDetected = false;
+
         await for (final line in stream) {
           if (line.startsWith('data:')) {
             String text = line.substring(5);
-            // CHÚ Ý: Không xóa dấu cách đầu tiên vì có vẻ backend dùng luôn dấu cách của chuẩn SSE làm dấu cách giữa các chữ!
 
             if (text.isEmpty) {
-              yield '\n'; // Nếu dòng data trống, có thể backend muốn gửi xuống dòng
+              yield '\n';
               continue;
             }
 
             if (text == '[DONE]' || text == '[DONE]\n') break;
 
-            // Bỏ qua các object JSON rác (như sessionId hay messageId)
+            // Bỏ qua các object JSON rác
             if (text.startsWith('{') && text.endsWith('}')) {
               continue;
             }
 
-            // Yield text từ bot
+            // Detect error response từ backend (VD: [Error: 500 ...])
+            if (_isErrorText(text)) {
+              errorDetected = true;
+              _logger.e('⚠️ Backend trả về lỗi trong stream: $text');
+              break;
+            }
+
             yield text;
           }
+        }
+
+        // Nếu phát hiện lỗi, yield thông báo thân thiện
+        if (errorDetected) {
+          yield 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
         }
       }
     } catch (e) {
       _logger.e('Send Anonymous Chat Stream Error: $e');
-
-      // Fallback khi API lỗi để bạn vẫn test được UI
-      final mockResponse =
-          'Đây là phản hồi ẩn danh tự động (Do API đang báo lỗi). Hệ thống ghi nhận bạn có dấu hiệu cần theo dõi thêm. Vui lòng đăng nhập để trao đổi chi tiết hơn.';
-      final words = mockResponse.split(' ');
-      for (var word in words) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        yield '$word ';
-      }
+      yield 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
     }
+  }
+
+  /// Kiểm tra xem text có phải là thông báo lỗi từ backend không
+  bool _isErrorText(String text) {
+    final t = text.trim();
+    return t.startsWith('[Error:') ||
+        t.startsWith('[error:') ||
+        t.contains('Internal Server Error') ||
+        t.contains('500') && t.contains('Error') ||
+        t.startsWith('Error:');
   }
 
   Future<bool> registerFirebase({

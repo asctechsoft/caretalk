@@ -144,15 +144,15 @@ class FirebaseService {
     required Map<String, dynamic> data,
   }) async {
     try {
-      await _firestore.collection(collection).doc(documentId).update({
+      await _firestore.collection(collection).doc(documentId).set({
         ...data,
         'updated_at': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       _logger.d('Document updated: $documentId in $collection');
       return true;
     } catch (e) {
       _logger.e('Error updating document $documentId in $collection: $e');
-      return false;
+      throw Exception(e.toString());
     }
   }
 

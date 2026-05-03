@@ -574,12 +574,14 @@ class _HomeScreenState extends State<HomeScreen>
             .length;
         final inProgressCount = docs.where((d) {
           final data = d.data() as Map<String, dynamic>;
-          return data['status'] == 'accepted' &&
+          // 'progress' = đang tư vấn
+          return data['status'] == 'progress' &&
               data['doctorId'] == currentUserId;
         }).length;
         final completedCount = docs.where((d) {
           final data = d.data() as Map<String, dynamic>;
-          return data['status'] == 'completed' &&
+          // 'accepted' = hoàn thành
+          return data['status'] == 'accepted' &&
               data['doctorId'] == currentUserId;
         }).length;
 
@@ -724,8 +726,8 @@ class _HomeScreenState extends State<HomeScreen>
                   controller: _tabController,
                   children: [
                     _buildPatientListView('waiting', docs, currentUserId),
-                    _buildPatientListView('in_progress', docs, currentUserId),
-                    _buildPatientListView('completed', docs, currentUserId),
+                    _buildPatientListView('progress', docs, currentUserId),
+                    _buildPatientListView('accepted', docs, currentUserId),
                   ],
                 ),
               ),
@@ -821,12 +823,15 @@ class _HomeScreenState extends State<HomeScreen>
       final docStatus = data['status'] ?? 'waiting';
       final docDoctorId = data['doctorId'] ?? '';
 
-      String filterStatus = status == 'in_progress' ? 'accepted' : status;
-
-      if (filterStatus == 'waiting') {
+      if (status == 'waiting') {
+        // Tab 0: tất cả consultation đang chờ bác sĩ nhận
         return docStatus == 'waiting';
+      } else if (status == 'progress') {
+        // Tab 1: đang tư vấn (của bác sĩ hiện tại)
+        return docStatus == 'progress' && docDoctorId == currentUserId;
       } else {
-        return docStatus == filterStatus && docDoctorId == currentUserId;
+        // Tab 2: hoàn thành (accepted = đã xong)
+        return docStatus == 'accepted' && docDoctorId == currentUserId;
       }
     }).toList();
 
@@ -1403,12 +1408,14 @@ class _PatientListCardWidget extends StatelessWidget {
         String phone = '---';
         String dobYear = '';
         String patientCode = '';
+        String symptom = 'Triệu chứng chưa rõ';
 
         if (snapshot.connectionState == ConnectionState.done &&
             snapshot.hasData) {
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           name = userData?['full_name'] ?? 'Bệnh nhân';
           phone = userData?['phone'] ?? 'Không có SĐT';
+          symptom = userData?['symptoms'] ?? 'Triệu chứng chưa rõ';
           final rawDob = userData?['dob'] ?? userData?['birthday'] ?? '';
           if (rawDob is String && rawDob.length >= 4) {
             dobYear = rawDob.substring(0, 4);

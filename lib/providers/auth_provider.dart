@@ -325,7 +325,41 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       _logger.e('Update profile error: $e');
-      _setError('Đã có lỗi xảy ra.');
+      _setError(
+        'Cập nhật thất bại: ${e.toString().replaceAll('Exception: ', '')}',
+      );
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  Future<bool> updateDoctorProfile(Map<String, dynamic> data) async {
+    if (_currentUser == null) return false;
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final success = await _firebaseService.updateDocument(
+        collection: 'doctors',
+        documentId: _currentUser!.id,
+        data: data,
+      );
+
+      if (success) {
+        // Reload profile after update
+        await loadProfile();
+        _setLoading(false);
+        return true;
+      } else {
+        _setError('Cập nhật thất bại');
+        _setLoading(false);
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Update profile error: $e');
+      _setError(
+        'Cập nhật thất bại: ${e.toString().replaceAll('Exception: ', '')}',
+      );
       _setLoading(false);
       return false;
     }

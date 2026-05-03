@@ -1,5 +1,6 @@
 import 'package:care_talk/core/widgets/app_button.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, Uint8List;
 import 'package:go_router/go_router.dart';
 import 'package:care_talk/core/constants/app_colors.dart';
 import 'package:care_talk/core/constants/app_dimens.dart';
@@ -11,7 +12,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:care_talk/core/services/storage_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:io';
 
 class PatientChatScreen extends StatefulWidget {
   final int? sessionIndex;
@@ -188,10 +188,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
 
     try {
       debugPrint('--- GỌI API CHATBOT ---');
-      final isAnonymous = FirebaseAuth.instance.currentUser == null;
-      final stream = isAnonymous
-          ? ApiService().sendAnonymousChatMessageStream(text)
-          : ApiService().sendChatMessageStream(text);
+      final stream = ApiService().sendAnonymousChatMessageStream(text);
 
       // Chuẩn bị một tin nhắn trống cho bot để hiển thị typing effect
       setState(() {
@@ -257,34 +254,39 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
   }
 
   Future<void> _pickImage() async {
-    // Yêu cầu quyền truy cập thư viện ảnh
-    var status = await Permission.photos.request();
+    // Trên web: bỏ qua permission_handler vì không hỗ trợ
+    if (!kIsWeb) {
+      var status = await Permission.photos.request();
 
-    if (status.isDenied) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Vui lòng cấp quyền truy cập ảnh để sử dụng tính năng này',
+      if (status.isDenied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Vui lòng cấp quyền truy cập ảnh để sử dụng tính năng này',
+            ),
           ),
-        ),
-      );
-      return;
-    }
+        );
+        return;
+      }
 
-    if (status.isPermanentlyDenied) {
-      openAppSettings();
-      return;
+      if (status.isPermanentlyDenied) {
+        openAppSettings();
+        return;
+      }
     }
 
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
     if (image != null) {
+      // Đọc bytes để dùng được cả trên web và mobile
+      final Uint8List imageBytes = await image.readAsBytes();
+
       setState(() {
         _messages.add({
           'isBot': false,
           'type': 'image',
-          'imagePath': image.path,
+          'imageBytes': imageBytes,
         });
 
         // Cập nhật lịch sử
@@ -319,7 +321,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
         });
         _saveHistory();
       });
-      _saveHistory(); // Save immediately after user sends image
+      _saveHistory();
     }
   }
 
@@ -572,11 +574,13 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
               child: msg['type'] == 'image'
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(msg['imagePath']),
-                        width: 200,
-                        fit: BoxFit.cover,
-                      ),
+                      child: msg['imageBytes'] != null
+                          ? Image.memory(
+                              msg['imageBytes'] as Uint8List,
+                              width: 200,
+                              fit: BoxFit.cover,
+                            )
+                          : const Icon(Icons.image_not_supported, size: 60),
                     )
                   : (isBot
                         ? MarkdownBody(

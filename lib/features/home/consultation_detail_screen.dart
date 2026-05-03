@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:care_talk/core/constants/app_colors.dart';
 import 'package:care_talk/core/router/app_router.dart';
 
@@ -88,11 +89,11 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
 
     final status = c['status'] as String? ?? 'waiting';
     final specialty = c['specialty'] as String? ?? 'Chưa rõ';
-    final symptoms = c['symptoms'] as String? ??
-        c['symptomDescription'] as String? ??
-        specialty;
-    final severityRaw =
-        (c['severity'] as String? ?? '').toLowerCase();
+    // final symptoms =
+    //     c['symptoms'] as String? ??
+    //     c['symptomDescription'] as String? ??
+    //     specialty;
+    final severityRaw = (c['severity'] as String? ?? '').toLowerCase();
     final createdAt = c['createdAt'] as Timestamp?;
     final docId = widget.consultationId;
 
@@ -102,6 +103,11 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
     final email = p['email'] as String? ?? '';
     final address = p['address'] as String? ?? '';
     final rawDob = p['dob'] ?? p['birthday'] ?? '';
+    final symptoms =
+        p['symptoms'] as String? ??
+        c['symptomDescription'] as String? ??
+        specialty;
+
     int? birthYear;
     if (rawDob is String && rawDob.length >= 4) {
       birthYear = int.tryParse(rawDob.substring(0, 4));
@@ -109,19 +115,21 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
     final age = birthYear != null ? DateTime.now().year - birthYear : null;
     final patientCode = (p['patientCode'] as String?)?.isNotEmpty == true
         ? p['patientCode']
-        : docId.substring(0, docId.length >= 6 ? 6 : docId.length).toUpperCase();
+        : docId
+              .substring(0, docId.length >= 6 ? 6 : docId.length)
+              .toUpperCase();
 
     // Status UI
     String statusLabel;
     Color statusColor;
     Color statusBg;
     switch (status) {
-      case 'accepted':
+      case 'progress':
         statusLabel = 'ĐANG TƯ VẤN';
         statusColor = AppColors.primary;
         statusBg = AppColors.primarySurface;
         break;
-      case 'completed':
+      case 'accepted':
         statusLabel = 'HOÀN THÀNH';
         statusColor = const Color(0xFF43A047);
         statusBg = const Color(0xFFE8F5E9);
@@ -136,7 +144,9 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
     String severityLabel = '';
     Color severityColor = Colors.grey;
     Color severityBg = Colors.grey.shade100;
-    if (severityRaw.contains('cao') || severityRaw.contains('nặng') || severityRaw == 'nang') {
+    if (severityRaw.contains('cao') ||
+        severityRaw.contains('nặng') ||
+        severityRaw == 'nang') {
       severityLabel = 'Cao';
       severityColor = const Color(0xFFE53935);
       severityBg = const Color(0xFFFFEBEE);
@@ -144,7 +154,9 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
       severityLabel = 'Trung bình';
       severityColor = const Color(0xFFFB8C00);
       severityBg = const Color(0xFFFFF3E0);
-    } else if (severityRaw.contains('thấp') || severityRaw.contains('nhẹ') || severityRaw == 'nhe') {
+    } else if (severityRaw.contains('thấp') ||
+        severityRaw.contains('nhẹ') ||
+        severityRaw == 'nhe') {
       severityLabel = 'Thấp';
       severityColor = const Color(0xFF43A047);
       severityBg = const Color(0xFFE8F5E9);
@@ -152,7 +164,13 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      appBar: _buildAppBar(context, patientCode, statusLabel, statusColor, statusBg),
+      appBar: _buildAppBar(
+        context,
+        patientCode,
+        statusLabel,
+        statusColor,
+        statusBg,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         child: Column(
@@ -338,7 +356,10 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
             _infoRow(icon: Icons.location_on_outlined, text: address),
 
           // Fallback nếu không có thông tin gì
-          if (birthYear == null && phone.isEmpty && email.isEmpty && address.isEmpty)
+          if (birthYear == null &&
+              phone.isEmpty &&
+              email.isEmpty &&
+              address.isEmpty)
             _infoRow(
               icon: Icons.info_outline,
               text: 'Chưa có thông tin bổ sung',
@@ -376,20 +397,19 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
   }
 
   // ─── Status Card ────────────────────────────────────────────────────
-  Widget _buildStatusCard(
-      BuildContext context, String status, String docId) {
+  Widget _buildStatusCard(BuildContext context, String status, String docId) {
     String description;
     IconData icon;
     Color accentColor;
 
     switch (status) {
-      case 'accepted':
+      case 'progress':
         description =
             'Bạn đang trong phiên tư vấn với bệnh nhân này. Tiếp tục cuộc trò chuyện để hoàn tất ca bệnh.';
         icon = Icons.chat_bubble_outline_rounded;
         accentColor = AppColors.primary;
         break;
-      case 'completed':
+      case 'accepted':
         description =
             'Ca tư vấn này đã kết thúc. Bạn có thể xem lại lịch sử hội thoại bên dưới.';
         icon = Icons.check_circle_outline_rounded;
@@ -458,16 +478,16 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   if (status == 'waiting') {
-                    // Nhận ca + chuyển sang chat
+                    final doctorId =
+                        FirebaseAuth.instance.currentUser?.uid ?? '';
+                    // Nhận ca → chuyển sang 'progress'
                     await FirebaseFirestore.instance
                         .collection('consultations')
                         .doc(docId)
-                        .update({'status': 'accepted'});
+                        .update({'status': 'progress', 'doctorId': doctorId});
                   }
                   if (context.mounted) {
-                    context.push(
-                      '${AppRouter.chatPath}?consultationId=$docId',
-                    );
+                    context.push('${AppRouter.chatPath}?consultationId=$docId');
                   }
                 },
                 icon: const Icon(Icons.chat_rounded, size: 18),
@@ -560,10 +580,7 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFFFF8F0),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFFFE0B2),
-                width: 1,
-              ),
+              border: Border.all(color: const Color(0xFFFFE0B2), width: 1),
             ),
             child: Text(
               symptoms,
@@ -580,8 +597,11 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
           // Thời gian ghi nhận
           Row(
             children: [
-              const Icon(Icons.access_time_rounded,
-                  size: 15, color: AppColors.textHint),
+              const Icon(
+                Icons.access_time_rounded,
+                size: 15,
+                color: AppColors.textHint,
+              ),
               const SizedBox(width: 5),
               Text(
                 'Ghi nhận: $timeStr',
@@ -601,8 +621,7 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(Icons.trending_up_rounded,
-                    size: 18, color: severityColor),
+                Icon(Icons.trending_up_rounded, size: 18, color: severityColor),
                 const SizedBox(width: 8),
                 const Text(
                   'Mức độ ưu tiên: ',
@@ -614,13 +633,16 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: severityBg,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                        color: severityColor.withValues(alpha: 0.35)),
+                      color: severityColor.withValues(alpha: 0.35),
+                    ),
                   ),
                   child: Text(
                     severityLabel,
@@ -641,8 +663,7 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
   }
 
   // ─── Bottom Bar ─────────────────────────────────────────────────────
-  Widget _buildBottomBar(
-      BuildContext context, String status, String docId) {
+  Widget _buildBottomBar(BuildContext context, String status, String docId) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       decoration: const BoxDecoration(
@@ -680,24 +701,23 @@ class _ConsultationDetailScreenState extends State<ConsultationDetailScreen> {
             child: ElevatedButton.icon(
               onPressed: () async {
                 if (status == 'waiting') {
+                  final doctorId = FirebaseAuth.instance.currentUser?.uid ?? '';
                   await FirebaseFirestore.instance
                       .collection('consultations')
                       .doc(docId)
-                      .update({'status': 'accepted'});
+                      .update({'status': 'progress', 'doctorId': doctorId});
                 }
                 if (context.mounted) {
-                  context.push(
-                    '${AppRouter.chatPath}?consultationId=$docId',
-                  );
+                  context.push('${AppRouter.chatPath}?consultationId=$docId');
                 }
               },
               icon: const Icon(Icons.chat_rounded, size: 18),
               label: Text(
-                status == 'completed'
+                status == 'accepted'
                     ? 'Xem hội thoại'
-                    : status == 'accepted'
-                        ? 'Tiếp tục tư vấn'
-                        : 'Bắt đầu tư vấn',
+                    : status == 'progress'
+                    ? 'Tiếp tục tư vấn'
+                    : 'Bắt đầu tư vấn',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,

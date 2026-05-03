@@ -242,7 +242,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                               'doctorId': '', // Để trống vì chưa có bác sĩ nhận
                               'status': 'waiting',
                               'specialty':
-                                  'Internal Medicine', // Có thể thêm UI chọn chuyên khoa sau
+                                  'Đa Khoa', // Có thể thêm UI chọn chuyên khoa sau
                               'createdAt': FieldValue.serverTimestamp(),
                               'updatedAt': FieldValue.serverTimestamp(),
                             });
@@ -253,7 +253,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
                           _showConsultationSuccessDialog(
                             context,
                             requestId,
-                            'Internal Medicine',
+                            'Đa Khoa',
                           );
                         }
                       } catch (e) {
@@ -433,45 +433,45 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
           SizedBox(height: 8),
 
-          // Center(
-          //   child: InkWell(
-          //     onTap: () {
-          //       context.pop();
-          //       context.push(AppRouter.patientConsultationHistoryPath);
-          //     },
-          //     child: Ink(
-          //       padding: const EdgeInsets.symmetric(
-          //         horizontal: 16,
-          //         vertical: 8,
-          //       ),
-          //       decoration: BoxDecoration(
-          //         borderRadius: BorderRadius.circular(8),
-          //       ),
-          //       child: Row(
-          //         children: [
-          //           const Icon(
-          //             Icons.request_quote_rounded,
-          //             color: AppColors.primary,
-          //           ),
-          //           const SizedBox(width: 16),
-          //           const Text(
-          //             'Yêu cầu với bác sĩ',
-          //             style: TextStyle(
-          //               color: AppColors.textPrimary,
-          //               fontSize: 16,
-          //               fontWeight: FontWeight.w500,
-          //             ),
-          //           ),
-          //         ],
-          //       ),
-          //     ),
-          //   ),
-          // ),
-          // Padding(
-          //   padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
-          //   child: Divider(),
-          // ),
-          // const SizedBox(height: 8),
+          Center(
+            child: InkWell(
+              onTap: () {
+                context.pop();
+                context.push(AppRouter.patientConsultationHistoryPath);
+              },
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.request_quote_rounded,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Yêu cầu với bác sĩ',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
+            child: Divider(),
+          ),
+          const SizedBox(height: 8),
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
